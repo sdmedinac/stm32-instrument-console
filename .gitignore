@@ -1,0 +1,38 @@
+# STM32CubeIDE build directories
+Debug/
+Release/
+
+# STM32CubeIDE local launch configurations
+*.launch
+
+# Compiled object and dependency files
+*.o
+*.d
+*.su
+*.cyclo
+
+# Firmware build outputs
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+# Static and shared libraries
+*.a
+*.lib
+*.so
+*.dll
+
+# Temporary and backup files
+*.tmp
+*.bak
+*~
+*.swp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Eclipse workspace metadata
+.metadata/
