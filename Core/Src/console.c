@@ -6,6 +6,7 @@
  */
 
 #include "console.h"
+#include "commands.h"
 
 #define RX_BUFFER_SIZE 64U
 
@@ -23,7 +24,7 @@ static char rx_buffer[RX_BUFFER_SIZE];
 static uint16_t rx_index;
 
 
-static void Console_WriteString(const char *text)
+void Console_Write(const char *text)
 {
 	uint16_t lenght = 0U;
 
@@ -45,8 +46,8 @@ void Console_Init(UART_HandleTypeDef *huart)
 	input_overflow = 0U;
 	rx_index = 0U;
 
-	Console_WriteString("\r\nSTM32 Instrument Console");
-	Console_WriteString(console_prompt);
+	Console_Write("\r\nSTM32 Instrument Console");
+	Console_Write(console_prompt);
 
 	HAL_UART_Receive_IT(console_uart, &rx_byte, 1U);
 
@@ -75,7 +76,7 @@ void Console_Process(void)
 			if((input_overflow == 0U) && (rx_index > 0U)){
 
 				rx_index--;
-				Console_WriteString("\b \b");
+				Console_Write("\b \b");
 			}
 		}
 		else if((current_byte == '\r') || (current_byte == '\n')){
@@ -84,7 +85,7 @@ void Console_Process(void)
 
 				rx_index = 0U;
 				input_overflow = 0U;
-				Console_WriteString(console_prompt);
+				Console_Write(console_prompt);
 			}
 			else if(rx_index > 0U){
 
@@ -106,7 +107,7 @@ void Console_Process(void)
 				else{
 
 					input_overflow = 1U;
-					Console_WriteString("\r\nInput limit reached. Press Enter to discard.");
+					Console_Write("\r\nInput limit reached. Press Enter to discard.");
 				}
 			}
 		}
@@ -116,9 +117,10 @@ void Console_Process(void)
 
 		line_ready = 0U;
 
-		Console_WriteString("\r\nReceived: ");
-		HAL_UART_Transmit(console_uart, (uint8_t *)rx_buffer, rx_index, HAL_MAX_DELAY);
-		Console_WriteString(console_prompt);
+		Console_Write("\r\n");
+		Commands_Execute(rx_buffer);
+		Console_Write("\r\n");
+		Console_Write(console_prompt);
 
 		rx_index = 0U;
 	}

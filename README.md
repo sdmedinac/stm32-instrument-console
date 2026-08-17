@@ -10,16 +10,16 @@ The UART console infrastructure is implemented and tested on hardware.
 
 Current features:
 
-- USART2 communication at 115200 baud
-- UART reception using interrupts
-- Character-by-character input processing
-- Line receive buffer
-- Enter detection
-- Backspace and Delete handling
-- Prompt protection
-- Input overflow detection and recovery
-- Modular console implementation
-- Cooperative superloop architecture
+* USART2 communication at 115200 baud
+* UART reception using interrupts
+* Character-by-character input processing
+* Line receive buffer
+* Enter detection
+* Backspace and Delete handling
+* Prompt protection
+* Input overflow detection and recovery
+* Modular console implementation
+* Cooperative superloop architecture
 
 Current terminal behavior:
 
@@ -34,38 +34,38 @@ The `Received:` response is temporary and will be replaced by the command parser
 
 ## Hardware
 
-- NUCLEO-F446RE
-- Integrated ST-LINK Virtual COM Port
-- User LED LD2
-- FNIRSI oscilloscope and signal generator for future experiments
+* NUCLEO-F446RE
+* Integrated ST-LINK Virtual COM Port
+* User LED LD2
+* FNIRSI oscilloscope and signal generator for future experiments
 
 ## Software
 
-- STM32CubeIDE
-- STM32 HAL
-- C
-- Git and GitHub
-- PuTTY
+* STM32CubeIDE
+* STM32 HAL
+* C
+* Git and GitHub
+* PuTTY
 
 ## Architecture
 
 The application initializes and continuously processes the console from `main.c`:
 
 ```c
-Console_Init(&huart2);
+Console\\\\\\\_Init(\\\\\\\&huart2);
 
 while (1)
 {
-    Console_Process();
+    Console\\\\\\\_Process();
 }
 ```
 
 The UART reception callback redirects the event to the console module:
 
 ```c
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void HAL\\\\\\\_UART\\\\\\\_RxCpltCallback(UART\\\\\\\_HandleTypeDef \\\\\\\*huart)
 {
-    Console_RxCpltCallback(huart);
+    Console\\\\\\\_RxCpltCallback(huart);
 }
 ```
 
@@ -117,16 +117,16 @@ The STM32 performs the character echo.
 
 The next development stage is the command interface:
 
-- [ ] Command parser
-- [ ] Command dispatch table
-- [ ] `help`
-- [ ] `status`
-- [ ] `version`
-- [ ] Modular LED driver
-- [ ] `led on`
-- [ ] `led off`
-- [ ] `led toggle`
-- [ ] `led status`
+* \[x] Command parser
+* \[x] Command dispatch table`
+* \[x] `help`
+* \[x] `status`
+* \[x] `version`
+* \[ ] Modular LED driver
+* \[ ] `led on`
+* \[ ] `led off`
+* \[ ] `led toggle`
+* \[ ] `led status`
 
 Future stages will include ADC measurements, timer-controlled sampling, DMA, signal analysis, and triggered event acquisition.
 
@@ -135,3 +135,4 @@ Future stages will include ADC measurements, timer-controlled sampling, DMA, sig
 **Samuel David Medina Contreras**
 
 Electronic Engineering student focused on firmware, embedded systems, data acquisition, and scientific instrumentation.
+
