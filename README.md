@@ -122,11 +122,11 @@ The next development stage is the command interface:
 * \[x] `help`
 * \[x] `status`
 * \[x] `version`
-* \[ ] Modular LED driver
-* \[ ] `led on`
-* \[ ] `led off`
-* \[ ] `led toggle`
-* \[ ] `led status`
+* \[x] Modular LED driver
+* \[x] `led on`
+* \[x] `led off`
+* \[x] `led toggle`
+* \[x] LED state reporting through `status`
 
 Future stages will include ADC measurements, timer-controlled sampling, DMA, signal analysis, and triggered event acquisition.
 
