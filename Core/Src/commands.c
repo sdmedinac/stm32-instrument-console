@@ -7,6 +7,7 @@
 
 #include "commands.h"
 #include "console.h"
+#include "led.h"
 
 #include <string.h>
 
@@ -23,13 +24,19 @@ typedef struct
 static void Command_Help(void);
 static void Command_Status(void);
 static void Command_Version(void);
+static void Command_LED_On(void);
+static void Command_LED_Off(void);
+static void Command_LED_Toggle(void);
 
 static const CommandEntry
 command_table[] = {
 
 		{"help", "Show available commands", Command_Help},
 		{"status", "Show system status", Command_Status},
-		{"version", "Show firmware version", Command_Version}
+		{"version", "Show firmware version", Command_Version},
+		{"led on", "Turn the user LED on", Command_LED_On},
+		{"led off", "Turn the user LED off", Command_LED_Off},
+		{"led toggle", "Toggle the user LED", Command_LED_Toggle}
 };
 
 #define COMMAND_COUNT (sizeof(command_table)/sizeof(command_table[0]))
@@ -70,6 +77,15 @@ static void Command_Status(void)
     Console_Write("\r\n UART: USART2");
     Console_Write("\r\n Baud rate: 115200");
     Console_Write("\r\n Input limit: 63 characters");
+
+    if(LED_IsOn()){
+
+    	Console_Write("\r\n LED: ON");
+    }
+    else{
+
+    	Console_Write("\r\n LED: OFF");
+    }
 }
 
 static void Command_Version(void)
@@ -78,4 +94,22 @@ static void Command_Version(void)
 	Console_Write("\r\n Name: STM32 Instrument Console");
 	Console_Write("\r\n Version: 0.1.0");
 	Console_Write("\r\n Target: STM32F446RE");
+}
+
+static void Command_LED_On(void)
+{
+	LED_On();
+	Console_Write("\r\n LED turned ON");
+}
+
+static void Command_LED_Off(void)
+{
+	LED_Off();
+	Console_Write("\r\n LED turned OFF");
+}
+
+static void Command_LED_Toggle(void)
+{
+	LED_Toggle();
+	Console_Write("\r\n LED toggled");
 }

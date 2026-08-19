@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "console.h"
+#include "led.h"
 
 /* USER CODE END Includes */
 
@@ -92,6 +93,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  LED_Init(LD2_GPIO_Port, LD2_Pin);
   Console_Init(&huart2);
 
   /* USER CODE END 2 */
