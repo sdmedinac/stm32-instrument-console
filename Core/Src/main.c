@@ -18,12 +18,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "adc.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "adc_measurement.h"
 #include "console.h"
 #include "led.h"
 
@@ -91,8 +93,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
+  ADC_Measurement_Init(&hadc1);
   LED_Init(LD2_GPIO_Port, LD2_Pin);
   Console_Init(&huart2);
 
@@ -106,9 +110,9 @@ int main(void)
 
 	  Console_Process();
 
-	  /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-	  /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
   }
 
   /* USER CODE END 3 */
@@ -122,7 +126,6 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
 
   /** Configure the main internal regulator output voltage
   */
