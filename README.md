@@ -1,88 +1,179 @@
 # STM32 Instrument Console
 
-A modular UART command-line console developed for the **NUCLEO-F446RE** using C and STM32 HAL.
+A modular embedded instrumentation platform developed for the **NUCLEO-F446RE** using **C** and **STM32 HAL**.
 
-This project is the first stage of an embedded instrumentation platform that will later include analog signal acquisition, measurements, and configurable event detection.
+The project currently provides a UART command console, modular GPIO control, and validated ADC measurements. It is being developed toward timer-controlled sampling, DMA-based acquisition, signal analysis, and configurable event triggering.
 
 ## Current Status
 
-The UART console infrastructure is implemented and tested on hardware.
+The current firmware has been implemented and tested on real hardware.
 
-Current features:
+### UART Console
 
-* USART2 communication at 115200 baud
-* UART reception using interrupts
-* Character-by-character input processing
-* Line receive buffer
-* Enter detection
-* Backspace and Delete handling
-* Prompt protection
-* Input overflow detection and recovery
-* Modular console implementation
-* Cooperative superloop architecture
+- USART2 communication at 115200 baud
+- UART reception using interrupts
+- Character-by-character input processing
+- Line receive buffer
+- Enter, Backspace, and Delete handling
+- Prompt protection
+- Input overflow detection and recovery
+- Cooperative superloop processing
 
-Current terminal behavior:
+### Command Interface
+
+- Command dispatch table using function pointers
+- Automatic command listing through `help`
+- Unknown-command handling
+- System information through `status` and `version`
+
+### LED Control
+
+- Modular LED driver
+- `led on`
+- `led off`
+- `led toggle`
+- LED state reported through `status`
+
+### ADC Measurements
+
+- ADC1 configured at 12-bit resolution
+- PA0 configured as `ADC1_IN0`
+- Single ADC conversions started by software
+- Raw ADC readings through `adc raw`
+- Voltage conversion through `adc voltage`
+- Multi-sample statistics through `adc stats`
+- Minimum, maximum, average, and peak-to-peak calculations
+- Raw statistics converted to volts
+- ADC validation using GND, 3.3 V, a resistor divider, a multimeter, and a potentiometer
+
+Example output:
 
 ```text
 STM32 Instrument Console
-> hello
-Received: hello
+> adc raw
+ADC raw: 2178
+
+> adc voltage
+ADC voltage: 1.764 V
+
+> adc stats
+ADC statistics:
+  Samples: 100
+  Minimum: 2183 (1.759 V)
+  Maximum: 2205 (1.777 V)
+  Average: 2191 (1.766 V)
+  Peak-to-peak: 22 (0.018 V)
 >
 ```
 
-The `Received:` response is temporary and will be replaced by the command parser.
+## Available Commands
+
+```text
+help          Show available commands
+status        Show system status
+version       Show firmware version
+led on        Turn the user LED on
+led off       Turn the user LED off
+led toggle    Toggle the user LED
+adc raw       Read one raw ADC sample
+adc voltage   Read the ADC input voltage
+adc stats     Show statistics for multiple ADC samples
+```
 
 ## Hardware
 
-* NUCLEO-F446RE
-* Integrated ST-LINK Virtual COM Port
-* User LED LD2
-* FNIRSI oscilloscope and signal generator for future experiments
+- NUCLEO-F446RE
+- Integrated ST-LINK programmer, debugger, and Virtual COM Port
+- User LED LD2 on PA5
+- Analog input A0 / PA0 / ADC1_IN0
+- Breadboard
+- Jumper wires
+- Resistors
+- Potentiometer
+- Multimeter
+- FNIRSI oscilloscope and signal generator for future experiments
 
 ## Software
 
-* STM32CubeIDE
-* STM32 HAL
-* C
-* Git and GitHub
-* PuTTY
+- STM32CubeIDE
+- STM32CubeMX
+- STM32 HAL
+- C
+- Git and GitHub
+- PuTTY
+- Python for future acquisition and visualization tools
 
 ## Architecture
 
-The application initializes and continuously processes the console from `main.c`:
+The application uses a cooperative superloop:
 
 ```c
-Console\\\\\\\_Init(\\\\\\\&huart2);
+ADC_Measurement_Init(&hadc1);
+LED_Init(LD2_GPIO_Port, LD2_Pin);
+Console_Init(&huart2);
 
 while (1)
 {
-    Console\\\\\\\_Process();
+    Console_Process();
 }
 ```
 
-The UART reception callback redirects the event to the console module:
+UART reception is interrupt-driven. The HAL callback forwards the reception event to the console module:
 
 ```c
-void HAL\\\\\\\_UART\\\\\\\_RxCpltCallback(UART\\\\\\\_HandleTypeDef \\\\\\\*huart)
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    Console\\\\\\\_RxCpltCallback(huart);
+    Console_RxCpltCallback(huart);
 }
 ```
 
-Project organization:
+The interrupt callback only marks that a byte is ready. Character processing, line editing, command execution, and console responses are handled later from the main superloop.
+
+### Module Responsibilities
 
 ```text
-Core/
-├── Inc/
-│   ├── console.h
-│   └── ...
-└── Src/
-    ├── console.c
-    ├── main.c
-    └── ...
+main.c
+  Hardware initialization and cooperative superloop
+
+console.c / console.h
+  UART reception, line editing, prompt, and console output
+
+commands.c / commands.h
+  Command table, lookup, dispatch, and responses
+
+led.c / led.h
+  Encapsulated GPIO control for LD2
+
+adc_measurement.c / adc_measurement.h
+  Raw ADC conversion, voltage conversion, and sample statistics
+
+adc.c / adc.h
+  ADC1 initialization generated by STM32CubeMX
 ```
 
-The console module keeps its UART state, receive buffer, flags, and input-processing logic private inside `console.c`.
+## ADC Validation
+
+The ADC implementation has been tested at several points across the input range.
+
+```text
+A0 connected to GND:
+  ADC raw: 0
+
+A0 connected to 3.3 V:
+  ADC raw: approximately 4083-4087
+  ADC voltage: approximately 3.29 V
+
+A0 connected to the midpoint of an equal-resistor divider:
+  ADC raw: approximately mid-scale
+  ADC voltage: approximately 1.6 V
+  Result confirmed with a multimeter
+
+A0 connected to a potentiometer:
+  Multi-sample minimum, maximum, average,
+  and peak-to-peak values validated
+```
+
+Measured values may differ slightly from ideal values because of resistor tolerance, supply variation, ADC quantization, reference accuracy, breadboard connections, and electrical noise.
 
 ## Serial Configuration
 
@@ -103,36 +194,84 @@ Local echo:         Force off
 Local line editing: Force off
 ```
 
-The STM32 performs the character echo.
+The STM32 performs character echo and line editing.
 
 ## Build and Run
 
-1. Open the project in STM32CubeIDE.
-2. Build the project using `Ctrl + B`.
-3. Connect the NUCLEO-F446RE through the ST-LINK USB connector.
-4. Program the MCU using Run or Debug.
-5. Open the ST-LINK Virtual COM Port at `115200 8N1`.
+1. Clone or download the repository.
+2. Import the project into STM32CubeIDE as an existing project.
+3. Build using `Ctrl + B`.
+4. Connect the NUCLEO-F446RE through the ST-LINK USB connector.
+5. Program the MCU using Run or Debug.
+6. Open the ST-LINK Virtual COM Port at `115200 8N1`.
 
-## Next Milestone
+## Development Roadmap
 
-The next development stage is the command interface:
+### Completed
 
-* \[x] Command parser
-* \[x] Command dispatch table`
-* \[x] `help`
-* \[x] `status`
-* \[x] `version`
-* \[x] Modular LED driver
-* \[x] `led on`
-* \[x] `led off`
-* \[x] `led toggle`
-* \[x] LED state reporting through `status`
+- [x] Modular UART console
+- [x] UART reception using interrupts
+- [x] Protected line buffer and input editing
+- [x] Command parser and dispatch table
+- [x] `help`, `status`, and `version`
+- [x] Modular LED driver and LED commands
+- [x] ADC1 configuration on PA0
+- [x] Raw ADC measurement
+- [x] ADC-to-voltage conversion
+- [x] Multi-sample ADC statistics
+- [x] Minimum, maximum, average, and peak-to-peak calculations
+- [x] Raw statistics converted to volts
+- [x] Hardware validation using GND, 3.3 V, a resistor divider, a multimeter, and a potentiometer
+- [x] Git and GitHub workflow
 
-Future stages will include ADC measurements, timer-controlled sampling, DMA, signal analysis, and triggered event acquisition.
+### Next Milestones
+
+- [ ] Validate controlled signals from the FNIRSI generator
+- [ ] Define and test analog input protection
+- [ ] Compare STM32 measurements with laboratory instruments
+- [ ] Configure timer-controlled sampling
+- [ ] Implement ADC acquisition using DMA
+- [ ] Store samples in acquisition buffers
+- [ ] Add acquisition state management
+- [ ] Add Python tools for data capture and visualization
+
+### Planned Advanced Features
+
+- [ ] Circular acquisition buffer
+- [ ] Configurable fixed-threshold trigger
+- [ ] Trigger hysteresis and dead time
+- [ ] Digital trigger output
+- [ ] Event counter and timestamps
+- [ ] Pre-trigger and post-trigger capture
+- [ ] Baseline and noise estimation
+- [ ] Adaptive trigger experiments
+- [ ] Trigger latency measurements
+- [ ] False-trigger analysis
+
+## Long-Term Goal
+
+The long-term objective is to build an educational embedded acquisition and event-triggering platform for controlled scientific instrumentation experiments.
+
+The project is inspired by general data-acquisition concepts such as continuous sampling, buffering, event detection, trigger decisions, monitoring, and event records.
+
+The project does **not** reproduce or replace the specialized electronics used by experiments such as DUNE. Any future connection to a research group must be defined with academic supervision and adapted to a real need.
+
+## Safety
+
+The STM32 ADC input is not an oscilloscope input.
+
+Before connecting an external signal generator:
+
+- Keep the input within the permitted MCU voltage range
+- Do not apply negative voltage directly to PA0
+- Connect the instrument ground to the Nucleo ground
+- Verify signal amplitude and offset before making the connection
+- Use suitable current limiting, voltage division, and input protection when required
+- Disconnect power while modifying breadboard wiring
+- Verify the official board pinout instead of relying only on connector labels
 
 ## Author
 
 **Samuel David Medina Contreras**
 
 Electronic Engineering student focused on firmware, embedded systems, data acquisition, and scientific instrumentation.
-
