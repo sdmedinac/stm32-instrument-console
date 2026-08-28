@@ -9,6 +9,8 @@
 #include "console.h"
 #include "led.h"
 #include "adc_measurement.h"
+#include "sampling_timer.h"
+#include "acquisition.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -32,6 +34,10 @@ static void Command_LED_Toggle(void);
 static void Command_ADC_Raw(void);
 static void Command_ADC_Voltage(void);
 static void Command_ADC_Stats(void);
+static void Command_Acquisition_Start(void);
+static void Command_Acquisition_Status(void);
+static void Command_Acquisition_Result(void);
+
 
 static const CommandEntry
 command_table[] = {
@@ -44,7 +50,10 @@ command_table[] = {
 		{"led toggle", "Toggle the user LED", Command_LED_Toggle},
 		{"adc raw", "Read the raw ADC value", Command_ADC_Raw},
 		{"adc voltage", "Read the ADC voltage value", Command_ADC_Voltage},
-		{"adc stats", "Show ADC sample statictis", Command_ADC_Stats}
+		{"adc stats", "Show ADC sample statictis", Command_ADC_Stats},
+		{"acq start", "Start a periodic ADC acquisition", Command_Acquisition_Start},
+		{"acq status", "Show acquisition status", Command_Acquisition_Status},
+		{"acq result", "Show the latest acquisition result", Command_Acquisition_Result}
 };
 
 #define COMMAND_COUNT (sizeof(command_table)/sizeof(command_table[0]))
@@ -203,5 +212,122 @@ static void Command_ADC_Stats(void)
 	else{
 
 		Console_Write("\r\nADC read error");
+	}
+}
+
+static void Command_Acquisition_Start(void)
+{
+	HAL_StatusTypeDef status = Acquisition_Start();
+
+	if(status == HAL_OK){
+
+		Console_Write("\r\nAcquisition started");
+	}
+	else if(status == HAL_BUSY){
+
+		Console_Write("\r\nAcquisition already running");
+	}
+	else{
+
+		Console_Write("\r\nAcquisition start error");
+	}
+}
+
+static void Command_Acquisition_Status(void)
+{
+	AcquisitionState state;
+	uint16_t sample_count;
+	uint32_t missed_events;
+	char response[160];
+	const char *state_text;
+
+	state = Acquisition_GetState();
+	sample_count = Acquisition_GetSampleCount();
+	missed_events = Acquisition_GetMissedEventCount();
+
+	switch(state)
+	{
+	case ACQUISITION_STATE_IDLE:
+		state_text = "IDLE";
+		break;
+
+	case ACQUISITION_STATE_RUNNING:
+		state_text = "RUNNING";
+		break;
+
+	case ACQUISITION_STATE_COMPLETE:
+		state_text = "COMPLETE";
+		break;
+
+	case ACQUISITION_STATE_ERROR:
+		state_text = "ERROR";
+		break;
+
+	default:
+		state_text = "UNKNOW";
+		break;
+	}
+
+	snprintf(
+			response,
+			sizeof(response),
+			"\r\nAcquisition status:"
+			"\r\n State: %s"
+			"\r\n Samples: %u"
+			"\r\n Missed events: %lu",
+			state_text,
+			(unsigned int)sample_count,
+			(unsigned long)missed_events
+	);
+
+	Console_Write(response);
+}
+
+
+static void Command_Acquisition_Result(void)
+{
+	ADC_MeasurementStats stats;
+	HAL_StatusTypeDef status;
+	char response[256];
+
+	float minimum_voltage;
+	float maximum_voltage;
+	float average_voltage;
+	float peak_to_peak_voltage;
+
+	status = Acquisition_GetStats(&stats);
+
+	if(status == HAL_OK){
+
+		minimum_voltage = ADC_Measurement_RawToVoltage(stats.minimum);
+		maximum_voltage = ADC_Measurement_RawToVoltage(stats.maximum);
+		average_voltage = ADC_Measurement_RawToVoltage(stats.average);
+		peak_to_peak_voltage = ADC_Measurement_RawToVoltage(stats.peak_to_peak);
+
+		snprintf(
+				response,
+				sizeof(response),
+				"\r\nAcquisition result:"
+				"\r\n Samples: %lu"
+				"\r\n minimum: %lu (%.3lf V)"
+				"\r\n maximum: %lu (%.3lf V)"
+				"\r\n average: %lu (%.3lf V)"
+				"\r\n peak-to-peak: %lu (%.3lf V)",
+				(unsigned long)stats.sample_count,
+				(unsigned long)stats.minimum, (double)minimum_voltage,
+				(unsigned long)stats.maximum, (double)maximum_voltage,
+				(unsigned long)stats.average, (double)average_voltage,
+				(unsigned long)stats.peak_to_peak, (double)peak_to_peak_voltage
+		);
+
+		Console_Write(response);
+	}
+	else if(status == HAL_BUSY){
+
+		Console_Write("\r\nNo completed acquisition is available");
+	}
+	else{
+
+		Console_Write("\r\nAcquisition result error");
 	}
 }

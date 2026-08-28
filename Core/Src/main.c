@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -28,6 +29,8 @@
 #include "adc_measurement.h"
 #include "console.h"
 #include "led.h"
+#include "sampling_timer.h"
+#include "acquisition.h"
 
 /* USER CODE END Includes */
 
@@ -94,9 +97,12 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_ADC1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
+  Sampling_TimerInit(&htim2);
   ADC_Measurement_Init(&hadc1);
+  Acquisition_Init();
   LED_Init(LD2_GPIO_Port, LD2_Pin);
   Console_Init(&huart2);
 
@@ -107,7 +113,7 @@ int main(void)
 
   while (1)
   {
-
+	  Acquisition_Process();
 	  Console_Process();
 
     /* USER CODE END WHILE */
@@ -176,6 +182,11 @@ void SystemClock_Config(void)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	Console_RxCpltCallback(huart);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	SamplingTimer_PeriodElapsedCallback(htim);
 }
 
 /* USER CODE END 4 */
