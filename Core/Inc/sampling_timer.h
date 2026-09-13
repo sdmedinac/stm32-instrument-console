@@ -13,8 +13,5 @@
 void Sampling_TimerInit(TIM_HandleTypeDef *htim);
 HAL_StatusTypeDef SamplingTimer_Start(void);
 HAL_StatusTypeDef SamplingTimer_Stop(void);
-void SamplingTimer_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
-uint32_t SamplingTimer_GetEventCount(void);
-void SamplingTimer_ResetEventCount(void);
 
 #endif /* INC_SAMPLING_TIMER_H_ */

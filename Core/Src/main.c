@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "dma.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -95,6 +96,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
   MX_ADC1_Init();
   MX_TIM2_Init();
@@ -184,9 +186,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	Console_RxCpltCallback(huart);
 }
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-	SamplingTimer_PeriodElapsedCallback(htim);
+	Acquisition_ConvCpltCallback(hadc);
+}
+
+void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
+{
+	Acquisition_ErrorCallback(hadc);
 }
 
 /* USER CODE END 4 */
