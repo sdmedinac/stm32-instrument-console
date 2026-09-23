@@ -14,8 +14,9 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-typedef void (*CommandHandler)(void);
+typedef void (*CommandHandler)(const char *args);
 
 typedef struct
 {
@@ -25,19 +26,19 @@ typedef struct
 
 }CommandEntry;
 
-static void Command_Help(void);
-static void Command_Status(void);
-static void Command_Version(void);
-static void Command_LED_On(void);
-static void Command_LED_Off(void);
-static void Command_LED_Toggle(void);
-static void Command_ADC_Raw(void);
-static void Command_ADC_Voltage(void);
-static void Command_Acquisition_Start(void);
-static void Command_Acquisition_Status(void);
-static void Command_Acquisition_Result(void);
-static void Command_Acquisition_Stop(void);
-
+static void Command_Help(const char *args);
+static void Command_Status(const char *args);
+static void Command_Version(const char *args);
+static void Command_LED_On(const char *args);
+static void Command_LED_Off(const char *args);
+static void Command_LED_Toggle(const char *args);
+static void Command_ADC_Raw(const char *args);
+static void Command_ADC_Voltage(const char *args);
+static void Command_Acquisition_Start(const char *args);
+static void Command_Acquisition_Status(const char *args);
+static void Command_Acquisition_Result(const char *args);
+static void Command_Acquisition_Stop(const char *args);
+static void Command_Acquisition_Rate(const char *args);
 
 static const CommandEntry
 command_table[] = {
@@ -53,28 +54,54 @@ command_table[] = {
 		{"acq start", "Start a periodic ADC acquisition", Command_Acquisition_Start},
 		{"acq status", "Show acquisition status", Command_Acquisition_Status},
 		{"acq result", "Show the latest acquisition result", Command_Acquisition_Result},
-		{"acq stop", "Stop the active acquisition", Command_Acquisition_Stop}
+		{"acq stop", "Stop the active acquisition", Command_Acquisition_Stop},
+		{"acq rate", "Set sampling rate in hz", Command_Acquisition_Rate}
 };
 
 #define COMMAND_COUNT (sizeof(command_table)/sizeof(command_table[0]))
 
 void Commands_Execute(const char *line)
 {
+	if(line == NULL){
+
+		Console_Write("\r\nInvalid command line");
+		return;
+	}
 
 	for(size_t i = 0U; i < COMMAND_COUNT; i++){
 
-		if(strcmp(command_table[i].name, line) == 0U){
+		size_t command_length = strlen(command_table[i].name);
 
-			command_table[i].handler();
-			return;
+		if(strncmp(line, command_table[i].name, command_length) != 0){
+
+			continue; // Pasa a la siguiente iteracion
 		}
+
+		if(line[command_length] != '\0' && line[command_length] != ' '){
+
+			continue;
+		}
+
+		const char *args;
+
+		args = &line[command_length]; // Apunta al primer caracter despues del nombre del comando
+
+		while(*args == ' '){
+
+			args++; // si args es un espacio apunta al siguiente caracter
+		}
+
+		command_table[i].handler(args);
+		return;
 	}
 
 	Console_Write("\r\nUnknown command. Type 'help'.");
 }
 
-static void Command_Help(void)
+static void Command_Help(const char *args)
 {
+	(void)args;
+
 	Console_Write("\r\nAvailable commands:");
 
 	for(size_t i = 0U; i < COMMAND_COUNT; i++){
@@ -87,8 +114,10 @@ static void Command_Help(void)
 	}
 }
 
-static void Command_Status(void)
+static void Command_Status(const char *args)
 {
+	(void)args;
+
 	Console_Write("\r\nSystem Status:");
     Console_Write("\r\n Console: Ready");
     Console_Write("\r\n UART: USART2");
@@ -105,34 +134,44 @@ static void Command_Status(void)
     }
 }
 
-static void Command_Version(void)
+static void Command_Version(const char *args)
 {
+	(void)args;
+
 	Console_Write("\r\nFirmware version:");
 	Console_Write("\r\n Name: STM32 Instrument Console");
 	Console_Write("\r\n Version: 0.1.0");
 	Console_Write("\r\n Target: STM32F446RE");
 }
 
-static void Command_LED_On(void)
+static void Command_LED_On(const char *args)
 {
+	(void)args;
+
 	LED_On();
 	Console_Write("\r\n LED turned ON");
 }
 
-static void Command_LED_Off(void)
+static void Command_LED_Off(const char *args)
 {
+	(void)args;
+
 	LED_Off();
 	Console_Write("\r\n LED turned OFF");
 }
 
-static void Command_LED_Toggle(void)
+static void Command_LED_Toggle(const char *args)
 {
+	(void)args;
+
 	LED_Toggle();
 	Console_Write("\r\n LED toggled");
 }
 
-static void Command_ADC_Raw(void)
+static void Command_ADC_Raw(const char *args)
 {
+	(void)args;
+
 	uint32_t raw_value;
 	HAL_StatusTypeDef status;
 	char response[32];
@@ -151,8 +190,10 @@ static void Command_ADC_Raw(void)
 
 }
 
-static void Command_ADC_Voltage(void)
+static void Command_ADC_Voltage(const char *args)
 {
+	(void)args;
+
 	float measured_voltage;
 	HAL_StatusTypeDef status;
 	char response[32];
@@ -170,8 +211,10 @@ static void Command_ADC_Voltage(void)
 	}
 }
 
-static void Command_Acquisition_Start(void)
+static void Command_Acquisition_Start(const char *args)
 {
+	(void)args;
+
 	HAL_StatusTypeDef status = Acquisition_Start();
 
 	if(status == HAL_OK){
@@ -188,11 +231,14 @@ static void Command_Acquisition_Start(void)
 	}
 }
 
-static void Command_Acquisition_Status(void)
+static void Command_Acquisition_Status(const char *args)
 {
+	(void)args;
+
 	AcquisitionState state;
 	AcquisitionError error;
 	uint16_t sample_count;
+	uint32_t sampling_frequency_hz;
 	char response[160];
 	const char *state_text;
 	const char *error_text;
@@ -200,6 +246,7 @@ static void Command_Acquisition_Status(void)
 	error = Acquisition_GetError();
 	state = Acquisition_GetState();
 	sample_count = Acquisition_GetSampleCount();
+	sampling_frequency_hz = SamplingTimer_GetFrequency();
 
 	switch(state)
 	{
@@ -267,18 +314,21 @@ static void Command_Acquisition_Status(void)
 			"\r\n Samples: %u"
 			"\r\n Error: %s"
 			"\r\n Transfer mode: DMA"
-			"\r\n Sampling rate: 1000 Hz",
+			"\r\n Sampling rate: %lu Hz",
 			state_text,
 			(unsigned int)sample_count,
-			error_text
+			error_text,
+			(unsigned long)sampling_frequency_hz
 	);
 
 	Console_Write(response);
 }
 
 
-static void Command_Acquisition_Result(void)
+static void Command_Acquisition_Result(const char *args)
 {
+	(void)args;
+
 	ADC_MeasurementStats stats;
 	HAL_StatusTypeDef status;
 	char response[256];
@@ -325,8 +375,10 @@ static void Command_Acquisition_Result(void)
 	}
 }
 
-static void Command_Acquisition_Stop(void)
+static void Command_Acquisition_Stop(const char *args)
 {
+	(void)args;
+
 	AcquisitionState state;
 	HAL_StatusTypeDef status;
 
@@ -358,4 +410,68 @@ static void Command_Acquisition_Stop(void)
 
 		Console_Write("\r\nAcquisition stop error");
 	}
+}
+
+static void Command_Acquisition_Rate(const char *args)
+{
+	unsigned long requested_frequency;
+	char *end_pointer;
+	HAL_StatusTypeDef status;
+    uint32_t actual_frequency;
+	char response[128];
+
+	if(*args == '\0'){
+
+		Console_Write("\r\nUsage: acq rate <10-10000hz>");
+		return;
+	}
+
+	requested_frequency = strtoul(args, &end_pointer, 10);
+
+	if((end_pointer == args) || (*end_pointer != '\0')){
+
+		Console_Write("\r\nInvalid sampling rate");
+		return;
+	}
+
+	if(requested_frequency > UINT32_MAX){
+
+		Console_Write("\r\nSampling rate is too large");
+		return;
+	}
+
+	status = SamplingTimer_SetFrequency((uint32_t)requested_frequency);
+
+	if(status == HAL_BUSY){
+
+		Console_Write("\r\nCannot change sampling rate while acquisition is running");
+		return;
+	}
+
+	if(status == HAL_ERROR){
+
+		Console_Write("\r\nSampling rate out of range");
+		Console_Write("\r\nValid range: <10-10000 Hz>");
+		return;
+	}
+
+	if(status != HAL_OK){
+
+		Console_Write("\r\nSampling rate update failed");
+		return;
+	}
+
+	actual_frequency = SamplingTimer_GetFrequency();
+
+	snprintf(
+			response,
+			sizeof(response),
+			"\r\nSampling rate updated:"
+			"\r\n Requested: %lu Hz"
+			"\r\n Actual: %lu Hz",
+			requested_frequency,
+			(unsigned long)actual_frequency
+	);
+
+	Console_Write(response);
 }

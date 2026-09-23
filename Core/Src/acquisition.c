@@ -9,28 +9,44 @@
 #include "adc_measurement.h"
 
 #define ACQUISITION_BUFFER_SIZE 100U
-#define ACQUISITION_TIMEOUT_MS 500U
+#define ACQUISITION_TIMEOUT_MARGIN_MS 500U
 
 static volatile AcquisitionState acquisition_state;
 static volatile AcquisitionError acquisition_error;
 static volatile uint16_t sample_index;
 static uint16_t sample_buffer[ACQUISITION_BUFFER_SIZE];
-static uint32_t acquisition_start_tick;
+static uint32_t acquisition_start_tick, acquisition_timeout_ms;
 
 void Acquisition_Init(void)
 {
-	acquisition_start_tick = 0;
+	acquisition_start_tick = 0U;
 	acquisition_state = ACQUISITION_STATE_IDLE;
 	acquisition_error = ACQUISITION_ERROR_NONE;
+	acquisition_timeout_ms = 0U;
 	sample_index = 0U;
 }
 
 HAL_StatusTypeDef Acquisition_Start(void)
 {
 	HAL_StatusTypeDef status;
+	uint64_t duration_numerator;
+	uint32_t expected_duration_ms, sampling_frequency_hz;
 
 	if(acquisition_state == ACQUISITION_STATE_RUNNING)
 		return HAL_BUSY;
+
+	sampling_frequency_hz = SamplingTimer_GetFrequency();
+
+	if(sampling_frequency_hz == 0){
+
+		acquisition_error = ACQUISITION_ERROR_TIMER_START;
+		acquisition_state = ACQUISITION_STATE_ERROR;
+		return HAL_ERROR;
+	}
+
+	duration_numerator = (uint64_t)ACQUISITION_BUFFER_SIZE * 1000U;
+	expected_duration_ms = (uint32_t)(duration_numerator + sampling_frequency_hz - 1U) / sampling_frequency_hz;
+	acquisition_timeout_ms = expected_duration_ms + ACQUISITION_TIMEOUT_MARGIN_MS;
 
 	acquisition_error = ACQUISITION_ERROR_NONE;
 	sample_index = 0U;
@@ -69,7 +85,7 @@ void Acquisition_Process(void)
 	current_tick = HAL_GetTick();
 	elapsed_time = current_tick - acquisition_start_tick;
 
-	if(elapsed_time < ACQUISITION_TIMEOUT_MS)
+	if(elapsed_time < acquisition_timeout_ms)
 		return;
 
 	acquisition_error = ACQUISITION_ERROR_TIMEOUT;
