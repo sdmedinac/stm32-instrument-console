@@ -1264,7 +1264,7 @@ python test automation
 Reproducible validation report
 ```
 
--*-
+---
 
 # Long-Term Goal
 
@@ -1272,18 +1272,18 @@ The long-term goal is to produce a tested and documented embedded instrumentatio
 
 ```text Embedded firmware
 + analog electronics
-+ data*acquisition
++ data acquisition
 + signal characterization
-+ calibra*ion
++ calibration
 + electronic monitoring
 + Python test automation
 + laboratory validation
 ```
 
-The final platform will be used to study how an anal*g signal passes through a simplified electronic readout chain, how the signal is sampled and stored, and*how the performance of the complete chain can be measured using controlled and reproducible experiments.
+The final platform will be used to study how an analog signal passes through a simplified electronic readout chain, how the signal is sampled and stored, and how the performance of the complete chain can be measured using controlled and reproducible experiments.
 The project is educational and inspired by general scientific instrumentation and detector-readout challenges.
 
-The project does not claim*equivalence with specialized detector electronics.
+The project does not claim equivalence with specialized detector electronics.
 
 The version 1.0 definition and completion criteria are maintained in:
 
@@ -1295,19 +1295,19 @@ docs/PROJECT_SCOPE.md
 
 # Safety
 
-The STM32 ADC input is not an oscilloscope input and*does not provide the same input protection.
+The STM32 ADC input is not an oscilloscope input and does not provide the same input protection.
 
 Before connecting an external signal generator:
 
 - Keep the input inside the permitted microcontroller voltage range.
 - Do not apply negative voltage directly to PA.
 - Connect the instrument ground to the Nucleo ground.
-- Verify sign*l amplitude and offset with the oscilloscope first.
-- Use suitable cu*rent limiting and voltage division*
+- Verify signal amplitude and offset with the oscilloscope first.
+- Use suitable current limiting and voltage division.
 - Add input protection when required.
 - Disconnect power while modifying breadboard wiring.
 - Verify the official board pinout.
-- Avoid ap*lying a signal while the expected voltage range is unknown.
+- Avoid applying a signal while the expected voltage range is unknown.
 - Confirm front-end output limits before connecting the output to the ADC.
 
 ---
