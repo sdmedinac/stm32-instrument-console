@@ -506,16 +506,16 @@ If a checksum or CRC is not implemented, the limitation must be documented.
 
 ## Acceptance Criteria
 
-- A computer can verify communication with the STM32.
-- A computer can configure the sampling frequency.
-- A computer can configure the sample count.
-- A computer can request an acquisition.
-- The STM32 can report acquisition completion.
-- The STM32 can report an acquisition error.
-- A computer can retrieve the complete acquisition buffer.
-- The receiver can verify the expected sample count.
-- Transferred samples can be saved without manual copying.
-- The beginning and end of an acquisition record can be identified.
+- [ ] A computer can verify communication with the STM32.
+- [ ] A computer can configure the sampling frequency.
+- [ ] A computer can configure the sample count.
+- [x] A computer can request an acquisition.
+- [x] The STM32 can report acquisition completion.
+- [x] The STM32 can report an acquisition error.
+- [x] A computer can retrieve the complete acquisition buffer.
+- [x] The receiver can verify the expected sample count.
+- [ ] Transferred samples can be saved without manual copying.
+- [x] The beginning and end of an acquisition record can be identified.
 
 ---
 
@@ -744,7 +744,7 @@ The version 1.0 release must contain:
 ## Firmware
 
 - [x] Sampling frequency configurable
-- [ ] Sample count configurable
+- [x] Sample count configurable
 - [x] TIM2 TRGO acquisition
 - [x] ADC1 regular conversion
 - [x] DMA buffer transfer
@@ -755,7 +755,7 @@ The version 1.0 release must contain:
 - [x] Consecutive acquisitions
 - [x] Basic acquisition error handling
 - [ ] Invalid configuration error
-- [ ] Buffer transfer through UART
+- [x] Buffer transfer through UART
 - [ ] Signal characterization
 - [ ] Baseline estimation
 - [ ] RMS noise calculation

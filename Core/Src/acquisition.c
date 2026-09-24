@@ -8,14 +8,17 @@
 #include "sampling_timer.h"
 #include "adc_measurement.h"
 
-#define ACQUISITION_BUFFER_SIZE 100U
+#define ACQUISITION_BUFFER_CAPACITY 1024U
+#define ACQUISITION_MIN_SAMPLE_COUNT 10U
+#define ACQUISITION_DEFAULT_SAMPLE_COUNT 100U
 #define ACQUISITION_TIMEOUT_MARGIN_MS 500U
 
 static volatile AcquisitionState acquisition_state;
 static volatile AcquisitionError acquisition_error;
 static volatile uint16_t sample_index;
-static uint16_t sample_buffer[ACQUISITION_BUFFER_SIZE];
+static uint16_t sample_buffer[ACQUISITION_BUFFER_CAPACITY], configured_sample_count;
 static uint32_t acquisition_start_tick, acquisition_timeout_ms;
+static uint32_t captured_sampling_frequency_hz;
 
 void Acquisition_Init(void)
 {
@@ -24,6 +27,34 @@ void Acquisition_Init(void)
 	acquisition_error = ACQUISITION_ERROR_NONE;
 	acquisition_timeout_ms = 0U;
 	sample_index = 0U;
+	configured_sample_count = ACQUISITION_DEFAULT_SAMPLE_COUNT;
+	captured_sampling_frequency_hz = 0U;
+}
+
+HAL_StatusTypeDef Acquisition_SetSampleCount(uint16_t sample_count)
+{
+	if(acquisition_state == ACQUISITION_STATE_RUNNING)
+		return HAL_BUSY;
+
+	if(sample_count < ACQUISITION_MIN_SAMPLE_COUNT)
+		return HAL_ERROR;
+
+	if(sample_count > ACQUISITION_BUFFER_CAPACITY)
+		return HAL_ERROR;
+
+	configured_sample_count = sample_count;
+
+	return HAL_OK;
+}
+
+uint16_t Acquisition_GetConfiguredSampleCount(void)
+{
+	return configured_sample_count;
+}
+
+uint16_t Acquisition_GetBufferCapacity(void)
+{
+	return ACQUISITION_BUFFER_CAPACITY;
 }
 
 HAL_StatusTypeDef Acquisition_Start(void)
@@ -44,14 +75,14 @@ HAL_StatusTypeDef Acquisition_Start(void)
 		return HAL_ERROR;
 	}
 
-	duration_numerator = (uint64_t)ACQUISITION_BUFFER_SIZE * 1000U;
+	duration_numerator = (uint64_t)configured_sample_count * 1000U;
 	expected_duration_ms = (uint32_t)(duration_numerator + sampling_frequency_hz - 1U) / sampling_frequency_hz;
 	acquisition_timeout_ms = expected_duration_ms + ACQUISITION_TIMEOUT_MARGIN_MS;
 
 	acquisition_error = ACQUISITION_ERROR_NONE;
 	sample_index = 0U;
 
-	status = ADC_Measurement_StartDMA(sample_buffer, ACQUISITION_BUFFER_SIZE);
+	status = ADC_Measurement_StartDMA(sample_buffer, configured_sample_count);
 
 	if(status != HAL_OK){
 
@@ -70,9 +101,15 @@ HAL_StatusTypeDef Acquisition_Start(void)
 		return status;
 	}
 
+	captured_sampling_frequency_hz = sampling_frequency_hz;
 	acquisition_start_tick = HAL_GetTick();
 	acquisition_state = ACQUISITION_STATE_RUNNING;
 	return HAL_OK;
+}
+
+uint32_t Acquisition_GetCapturedSamplingFrequency(void)
+{
+	return captured_sampling_frequency_hz;
 }
 
 void Acquisition_Process(void)
@@ -122,7 +159,7 @@ HAL_StatusTypeDef Acquisition_GetStats(ADC_MeasurementStats *stats)
 		return HAL_ERROR;
 	}
 
-	uint64_t sum = sample_buffer[0];
+	uint64_t sum = 0U;
 	uint16_t maximum = sample_buffer[0];
 	uint16_t minimum = sample_buffer[0];
 
@@ -178,7 +215,7 @@ void Acquisition_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 		return;
 	}
 
-	sample_index = ACQUISITION_BUFFER_SIZE;
+	sample_index = configured_sample_count;
 	acquisition_state = ACQUISITION_STATE_COMPLETE;
 }
 
@@ -232,5 +269,21 @@ HAL_StatusTypeDef Acquisition_Stop(void)
 	sample_index = 0U;
 	acquisition_error = ACQUISITION_ERROR_NONE;
 	acquisition_state = ACQUISITION_STATE_IDLE;
+	return HAL_OK;
+}
+
+HAL_StatusTypeDef Acquisition_GetSample(uint16_t index, uint16_t *sample)
+{
+	if(sample == NULL)
+		return HAL_ERROR;
+
+	if(acquisition_state != ACQUISITION_STATE_COMPLETE)
+		return HAL_BUSY;
+
+	if(index >= sample_index)
+		return HAL_ERROR;
+
+	*sample = sample_buffer[index];
+
 	return HAL_OK;
 }

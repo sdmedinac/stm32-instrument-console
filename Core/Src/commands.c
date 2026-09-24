@@ -39,6 +39,8 @@ static void Command_Acquisition_Status(const char *args);
 static void Command_Acquisition_Result(const char *args);
 static void Command_Acquisition_Stop(const char *args);
 static void Command_Acquisition_Rate(const char *args);
+static void Command_Acquisition_Size(const char *args);
+static void Command_Acquisition_Dump(const char *args);
 
 static const CommandEntry
 command_table[] = {
@@ -55,7 +57,10 @@ command_table[] = {
 		{"acq status", "Show acquisition status", Command_Acquisition_Status},
 		{"acq result", "Show the latest acquisition result", Command_Acquisition_Result},
 		{"acq stop", "Stop the active acquisition", Command_Acquisition_Stop},
-		{"acq rate", "Set sampling rate in hz", Command_Acquisition_Rate}
+		{"acq rate", "Set sampling rate in hz", Command_Acquisition_Rate},
+		{"acq size", "Set the acquisition sample count", Command_Acquisition_Size},
+		{"acq dump", "Export the completed acq buffer", Command_Acquisition_Dump}
+
 };
 
 #define COMMAND_COUNT (sizeof(command_table)/sizeof(command_table[0]))
@@ -237,15 +242,19 @@ static void Command_Acquisition_Status(const char *args)
 
 	AcquisitionState state;
 	AcquisitionError error;
-	uint16_t sample_count;
+	uint16_t valid_sample_count; // Muestras validas de la ultima adquisicion
+	uint16_t configured_samples; // Muestras solicitadas para la proxima adquisicion
+	uint16_t buffer_capacity; // Cantidad maxima que cabe fisicamente
 	uint32_t sampling_frequency_hz;
-	char response[160];
+	char response[256];
 	const char *state_text;
 	const char *error_text;
 
 	error = Acquisition_GetError();
 	state = Acquisition_GetState();
-	sample_count = Acquisition_GetSampleCount();
+	valid_sample_count = Acquisition_GetSampleCount();
+	configured_samples = Acquisition_GetConfiguredSampleCount();
+	buffer_capacity = Acquisition_GetBufferCapacity();
 	sampling_frequency_hz = SamplingTimer_GetFrequency();
 
 	switch(state)
@@ -311,12 +320,16 @@ static void Command_Acquisition_Status(const char *args)
 			sizeof(response),
 			"\r\nAcquisition status:"
 			"\r\n State: %s"
-			"\r\n Samples: %u"
+			"\r\n Valid samples: %u"
+			"\r\n Configured samples: %u"
+			"\r\n Buffer capacity: %u"
 			"\r\n Error: %s"
 			"\r\n Transfer mode: DMA"
 			"\r\n Sampling rate: %lu Hz",
 			state_text,
-			(unsigned int)sample_count,
+			(unsigned int)valid_sample_count,
+			(unsigned int)configured_samples,
+			(unsigned int)buffer_capacity,
 			error_text,
 			(unsigned long)sampling_frequency_hz
 	);
@@ -474,4 +487,130 @@ static void Command_Acquisition_Rate(const char *args)
 	);
 
 	Console_Write(response);
+}
+
+static void Command_Acquisition_Size(const char *args)
+{
+	unsigned long requested_sample_count;
+	char *end_pointer;
+	HAL_StatusTypeDef status;
+	uint16_t configured_sample_count;
+	uint16_t buffer_capacity;
+	char response[128];
+
+	if(*args == '\0'){
+
+		Console_Write("\r\nUsage: acq size <10-1024>");
+		return;
+	}
+
+	requested_sample_count = strtoul(args, &end_pointer, 10);
+
+	if((end_pointer == args) || (*end_pointer != '\0')){
+
+		Console_Write("\r\nInvalid sample count");
+		return;
+	}
+
+	if(requested_sample_count > UINT16_MAX){
+
+		Console_Write("\r\nSample count is too large");
+		return;
+	}
+
+	status = Acquisition_SetSampleCount((uint16_t)requested_sample_count);
+
+	if(status == HAL_BUSY){
+
+		Console_Write("\r\nCannot change sample count while acquisition is running");
+		return;
+	}
+
+	if(status == HAL_ERROR){
+
+		Console_Write("\r\nSample count out of range");
+		Console_Write("\r\nValid range: <10-1024> samples");
+		return;
+	}
+
+	if(status != HAL_OK){
+
+		Console_Write("\r\nSample count update failed");
+		return;
+	}
+
+	configured_sample_count = Acquisition_GetConfiguredSampleCount();
+	buffer_capacity = Acquisition_GetBufferCapacity();
+
+	snprintf(
+			response,
+			sizeof(response),
+			"\r\nAcquisition size updated:"
+			"\r\n Configured samples: %u"
+			"\r\n Buffer capacity: %u",
+			(unsigned int)configured_sample_count,
+			(unsigned int)buffer_capacity
+	);
+
+	Console_Write(response);
+}
+
+static void Command_Acquisition_Dump(const char *args)
+{
+	(void)args; // comando sin argumentos
+
+	AcquisitionState state;
+	uint16_t index, valid_samples;
+	uint16_t sample;
+	uint32_t captured_sampling_frequency;
+	HAL_StatusTypeDef status;
+	char line[64];
+
+	state = Acquisition_GetState();
+
+	if(state != ACQUISITION_STATE_COMPLETE){
+
+		Console_Write("\r\nNo completed acquisition is available");
+		return;
+	}
+
+	valid_samples = Acquisition_GetSampleCount();
+	captured_sampling_frequency = Acquisition_GetCapturedSamplingFrequency();
+
+	Console_Write("\r\nBEGUIN_ACQUISITION");
+	snprintf(
+			line,
+			sizeof(line),
+			"\r\nRATE_HZ, %lu"
+			"\r\nSAMPLE_COUNT, %u"
+			"\r\nFORMAT, INDEX_RAW"
+			"\r\nDATA",
+			(unsigned long)captured_sampling_frequency,
+			(unsigned int)valid_samples
+	);
+
+	Console_Write(line);
+
+	for(index = 0; index < valid_samples; index++){
+
+		status = Acquisition_GetSample(index, &sample);
+
+		if(status != HAL_OK){
+
+			Console_Write("\r\nDUMP ERROR");
+			return;
+		}
+
+		snprintf(
+				line,
+				sizeof(line),
+				"\r\n%u, %u",
+				(unsigned int)index,
+				(unsigned int)sample
+		);
+
+		Console_Write(line);
+	}
+
+	Console_Write("\r\nEND_ACQUISITION");
 }

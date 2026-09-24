@@ -2,13 +2,13 @@
 
 A modular embedded platform for analog signal acquisition, monitoring, calibration, and characterization, developed for the **NUCLEO-F446RE** using **Embedded C** and the **STM32 HAL**.
 
-The project combines hardware-controlled ADC sampling, DMA-based data acquisition, diagnostic measurements, signal buffering, error handling, and laboratory validation.
+The project combines hardware-controlled ADC sampling, DMA-based data acquisition, configurable acquisition windows, diagnostic measurements, signal buffering, error handling, structured data export, and laboratory validation.
 
-The long-term objective is to build an educational instrumentation platform for characterizing a simplified analog readout chain using controlled test signals, an educational analog front-end, and reproducible calibration experiments.
+The long-term objective is to build an educational instrumentation platform for characterizing a simplified analog readout chain using controlled test signals, an educational analog front-end, reproducible calibration experiments, and Python-based test automation.
 
 ## Project Motivation
 
-Scientific instrumentation systems must acquire analog signals at controlled sampling times, transfer digitized data efficiently, monitor system operation, and evaluate the performance of the electronic readout chain.
+Scientific instrumentation systems must acquire analog signals at controlled sampling times, transfer digitized data efficiently, monitor system operation, characterize signal quality, and evaluate the performance of the electronic readout chain.
 
 This project explores simplified versions of those engineering challenges using an STM32 microcontroller and laboratory equipment.
 
@@ -17,24 +17,57 @@ The project is conceptually inspired by topics found in scientific detector read
 - Analog signal conditioning
 - Controlled and synchronized sampling
 - Analog-to-digital conversion
-- Data buffering
+- DMA-based data movement
+- Acquisition buffers
 - Calibration using known signals
 - Electronic monitoring
 - Noise and waveform characterization
 - Reliable data transfer
-- Performance validation
+- Repeatable performance validation
 
 This project does **not** reproduce or replace the specialized electronics used by DUNE or other scientific experiments.
 
 Any future connection to a research group must be defined with academic supervision and adapted to a real instrumentation need.
 
-## Current Status
+---
+
+# Current Status
 
 The current firmware has been implemented and tested on real hardware.
 
-The platform currently supports two independent ADC measurement paths.
+The platform currently supports:
 
-### Immediate Diagnostic Measurement
+- Immediate ADC diagnostic measurements
+- Hardware-timed DMA acquisition
+- Configurable sampling frequency
+- Configurable acquisition sample count
+- Dynamic acquisition timeout
+- Acquisition state and error reporting
+- Safe manual acquisition stop
+- Buffer statistics
+- Complete acquisition-buffer export through UART
+
+The acquisition system has been tested with:
+
+- Known DC input levels
+- GND
+- 3.3 V
+- A resistor divider
+- A potentiometer
+- A multimeter
+- Sampling frequencies from 10 Hz to 10 kHz
+- Acquisition sizes from 10 to 1024 samples
+- Repeated acquisitions
+- Manual stop during an active acquisition
+- Full buffer exports containing up to 1024 samples
+
+---
+
+# Measurement Paths
+
+The platform uses two independent ADC measurement paths.
+
+## Immediate Diagnostic Measurement
 
 ```text
 UART command
@@ -53,7 +86,13 @@ adc raw
 adc voltage
 ```
 
-### Hardware-Timed Acquisition
+It answers the question:
+
+```text
+What is the input voltage right now?
+```
+
+## Hardware-Timed Acquisition
 
 ```text
 TIM2 update event
@@ -68,24 +107,35 @@ ADC1 regular conversion
 DMA2 Stream 0
     |
     v
-Sample buffer
+Acquisition buffer
     |
     v
-Acquisition statistics
+Statistics or data export
 ```
 
 This path is used by:
 
 ```text
+acq rate
+acq size
 acq start
-acq status
 acq stop
+acq status
 acq result
+acq dump
 ```
 
-## Implemented Features
+It answers the question:
 
-### UART Console
+```text
+How did the analog signal behave during a controlled acquisition window?
+```
+
+---
+
+# Implemented Features
+
+## UART Console
 
 - USART2 communication at 115200 baud
 - UART reception using interrupts
@@ -98,16 +148,22 @@ acq result
 - Command prompt
 - Invalid command reporting
 
-### Command Interface
+## Command Interface
 
 - Modular command system
 - Command dispatch table using function pointers
+- Command handlers with argument support
+- Prefix matching with command-boundary validation
+- Argument extraction without copying the command line
+- Numeric argument conversion using `strtoul()`
+- Rejection of invalid numeric input
+- Rejection of trailing invalid characters
 - Automatic command listing through `help`
 - System information through `status`
 - Firmware information through `version`
 - Separation between command handling and peripheral drivers
 
-### LED Diagnostics
+## LED Diagnostics
 
 - Modular GPIO driver for the NUCLEO user LED
 - `led on`
@@ -115,9 +171,9 @@ acq result
 - `led toggle`
 - LED state reported through `status`
 
-The LED commands are currently retained as hardware diagnostic tools. In a later version, the LED may be assigned to system status indication.
+The LED commands are retained as basic hardware diagnostic tools.
 
-### Immediate ADC Measurements
+## Immediate ADC Measurements
 
 - ADC1 configured at 12-bit resolution
 - PA0 configured as `ADC1_IN0`
@@ -128,19 +184,42 @@ The LED commands are currently retained as hardware diagnostic tools. In a later
 - Conversion timeout handling
 - ADC handle validation
 - Immediate measurements separated from timed DMA acquisition
+- Immediate ADC diagnostics rejected while an acquisition is running
 
-### Timer Configuration
+## Configurable Timer
 
 - TIM2 used as the sampling time base
 - Timer input clock of 90 MHz
-- Prescaler configured to 89
-- Auto-reload value configured to 999
-- Initial sampling rate of approximately 1 kHz
-- TIM2 update event configured as TRGO
-- ADC1 regular group triggered from TIM2 TRGO
-- Timer does not require a CPU interrupt for every sample
+- Prescaler fixed at 89
+- Timer counter clock of 1 MHz
+- Auto-reload value configured dynamically
+- Configurable sampling-frequency range from 10 Hz to 10 kHz
+- Requested sampling frequency validated
+- Actual achievable sampling frequency calculated and reported
+- Timer reconfiguration rejected while TIM2 is running
+- Timer counter restarted from zero after reconfiguration
+- Internal logical timer state tracked by the sampling-timer module
 
-### Timer Validation
+The timer period is calculated using:
+
+```text
+timer_counts = 1,000,000 / requested_frequency
+
+ARR = timer_counts - 1
+
+actual_frequency = 1,000,000 / timer_counts
+```
+
+For example:
+
+```text
+Requested frequency: 3000 Hz
+Timer counts:        333
+ARR:                 332
+Actual frequency:    3003 Hz
+```
+
+## Timer Validation
 
 TIM2 was initially validated using one-second interrupt-counting tests.
 
@@ -152,9 +231,9 @@ Test 2: 1001 events
 Test 3: 1000 events
 ```
 
-These results confirmed an effective event rate close to 1 kHz before TIM2 was connected directly to ADC1.
+These results confirmed an effective timer event rate close to 1 kHz before TIM2 was connected directly to ADC1.
 
-### DMA-Based Acquisition
+## DMA-Based Acquisition
 
 - ADC1 regular group triggered by TIM2 TRGO
 - DMA2 Stream 0 configured for peripheral-to-memory transfers
@@ -163,15 +242,52 @@ These results confirmed an effective event rate close to 1 kHz before TIM2 was c
 - 16-bit peripheral transfer width
 - 16-bit memory transfer width
 - DMA normal mode
-- Fixed acquisition buffer of 100 samples
+- Maximum acquisition-buffer capacity of 1024 samples
+- Default acquisition size of 100 samples
+- Configurable acquisition size from 10 to 1024 samples
 - DMA transfer-complete callback
 - ADC and DMA error callback
 - Safe ADC, DMA, and timer start sequence
-- Safe stop sequence
+- Safe manual stop sequence
 - Multiple consecutive acquisitions supported
 - CPU does not copy each individual ADC sample
 
-### Acquisition State Management
+## Buffer Model
+
+The acquisition module separates three different concepts:
+
+```text
+Buffer capacity
+    Maximum physical storage available in RAM
+
+Configured samples
+    Number of samples requested for the next acquisition
+
+Valid samples
+    Number of valid samples stored by the last completed acquisition
+```
+
+Current values:
+
+```text
+Maximum buffer capacity: 1024 samples
+Default configured size: 100 samples
+Configurable range:      10 to 1024 samples
+Storage per sample:      2 bytes
+Total buffer storage:    2048 bytes
+```
+
+For example:
+
+```text
+Buffer capacity:     1024
+Configured samples:   512
+Valid samples:        100
+```
+
+This means that the last completed acquisition contains 100 valid samples, while the next acquisition is configured to capture 512 samples.
+
+## Acquisition State Management
 
 The acquisition module contains the following states:
 
@@ -182,7 +298,7 @@ COMPLETE
 ERROR
 ```
 
-The acquisition module also records specific error causes:
+The acquisition module records specific error causes:
 
 ```text
 NONE
@@ -194,19 +310,49 @@ ADC_DMA
 TIMEOUT
 ```
 
-### Acquisition Timeout
+## Dynamic Acquisition Timeout
 
-- Non-blocking acquisition supervision using `HAL_GetTick()`
-- Current timeout configured to 500 ms
-- Timeout monitoring performed from the cooperative superloop
+The acquisition timeout is calculated using:
+
+```text
+Expected duration =
+configured sample count / actual sampling frequency
+```
+
+In milliseconds:
+
+```text
+expected_duration_ms =
+ceil(configured_samples * 1000 / sampling_frequency_hz)
+```
+
+The total timeout is:
+
+```text
+acquisition_timeout_ms =
+expected_duration_ms + timeout_margin_ms
+```
+
+Current timeout margin:
+
+```text
+500 ms
+```
+
+Implemented behavior:
+
+- Non-blocking timeout supervision using `HAL_GetTick()`
+- Timeout monitoring from the cooperative superloop
+- Timeout adjusted automatically to sampling rate and sample count
 - ADC, DMA, and TIM2 cleanup after timeout
-- Late completion callbacks prevented from changing an error state to `COMPLETE`
+- Late completion callbacks prevented from changing `ERROR` to `COMPLETE`
+- Timer-trigger and DMA operation remain asynchronous
 
-The normal acquisition path has been tested successfully. Controlled fault-injection testing of the timeout path is still pending.
+The normal acquisition path has been tested successfully. Controlled fault-injection testing of the timeout path remains pending.
 
-### Acquisition Statistics
+## Acquisition Statistics
 
-The current firmware calculates the following values from the completed DMA buffer:
+The firmware currently calculates:
 
 - Number of valid samples
 - Minimum ADC value
@@ -218,31 +364,134 @@ The current firmware calculates the following values from the completed DMA buff
 - Average voltage
 - Peak-to-peak voltage
 
-These statistics are calculated from the stored acquisition buffer. They do not start new ADC conversions.
+These statistics are calculated only from the valid samples of the latest completed acquisition.
 
-## Current Commands
+The statistics operation:
+
+- Does not start new ADC conversions
+- Does not modify the acquisition buffer
+- Does not process unused buffer positions
+- Remains valid after changing the next acquisition configuration
+
+## Safe Sample Access
+
+The acquisition buffer remains private inside `acquisition.c`.
+
+Other modules cannot access or modify the buffer directly.
+
+Samples are retrieved using a controlled public function that validates:
+
+- Output pointer
+- Acquisition state
+- Requested index
+- Number of valid samples
+
+This preserves encapsulation and distinguishes between:
 
 ```text
-help          Show available commands
-status        Show system status
-version       Show firmware version
-
-led on        Turn the user LED on
-led off       Turn the user LED off
-led toggle    Toggle the user LED
-
-adc raw       Read one immediate raw ADC sample
-adc voltage   Read the immediate ADC input voltage
-
-acq start     Start a hardware-timed DMA acquisition
-acq stop      Stop an active acquisition
-acq status    Show acquisition state and error information
-acq result    Show statistics from the latest completed acquisition
+A valid ADC sample equal to zero
 ```
 
-The former `adc stats` command was removed because timed multi-sample analysis is now performed using `acq start` and `acq result`.
+and:
 
-## Example Console Session
+```text
+An invalid sample request
+```
+
+## Acquisition Data Export
+
+The `acq dump` command exports the latest completed acquisition using a structured, machine-readable text format.
+
+Example:
+
+```text
+BEGIN_ACQUISITION
+RATE_HZ,1000
+SAMPLE_COUNT,10
+FORMAT,INDEX_RAW
+DATA
+0,2048
+1,2050
+2,2049
+3,2051
+4,2047
+5,2048
+6,2052
+7,2050
+8,2049
+9,2048
+END_ACQUISITION
+```
+
+The export contains:
+
+- Start marker
+- Sampling frequency used for the stored capture
+- Number of valid samples
+- Data-format declaration
+- Sample index
+- Raw ADC value
+- End marker
+
+The exported sampling frequency is captured when the acquisition starts. It continues to describe the stored acquisition even if TIM2 is reconfigured afterward.
+
+The exported sample count is taken from the number of valid samples, not from the configuration selected for a future acquisition.
+
+The data-export path has been tested with:
+
+```text
+10 samples
+100 samples
+512 samples
+1024 samples
+```
+
+Validated behavior includes:
+
+- First index equal to zero
+- Last index equal to `sample_count - 1`
+- Raw ADC values remaining between 0 and 4095
+- Correct start and end markers
+- Repeated dumps producing identical data
+- Buffer statistics remaining available after a dump
+- Console remaining responsive after a 1024-sample export
+- Dumps rejected from `IDLE`
+- Dumps rejected from `RUNNING`
+- Dumps rejected after a manual stop
+- Partial acquisitions never exported as complete data
+
+The current UART export is blocking. This is acceptable because data export is only allowed after the acquisition has completed and TIM2, ADC1, and DMA have been stopped.
+
+---
+
+# Current Commands
+
+```text
+help                      Show available commands
+status                    Show system status
+version                   Show firmware version
+
+led on                    Turn the user LED on
+led off                   Turn the user LED off
+led toggle                Toggle the user LED
+
+adc raw                   Read one immediate raw ADC sample
+adc voltage               Read the immediate ADC input voltage
+
+acq rate <Hz>             Set the sampling frequency
+acq size <samples>        Set the acquisition sample count
+acq start                 Start a hardware-timed DMA acquisition
+acq stop                  Stop an active acquisition
+acq status                Show acquisition state and configuration
+acq result                Show statistics from the latest acquisition
+acq dump                  Export the latest completed acquisition
+```
+
+The former `adc stats` command was removed because timed multi-sample analysis is performed using `acq start` and `acq result`.
+
+---
+
+# Example Console Session
 
 ```text
 STM32 Instrumentation Platform
@@ -252,10 +501,22 @@ ADC raw: 2048
 > adc voltage
 ADC voltage: 1.650 V
 
+> acq rate 1000
+Sampling rate updated:
+  Requested: 1000 Hz
+  Actual: 1000 Hz
+
+> acq size 10
+Acquisition size updated:
+  Configured samples: 10
+  Buffer capacity: 1024
+
 > acq status
 Acquisition status:
   State: IDLE
-  Samples: 0
+  Valid samples: 0
+  Configured samples: 10
+  Buffer capacity: 1024
   Error: NONE
   Transfer mode: DMA
   Sampling rate: 1000 Hz
@@ -266,27 +527,49 @@ Acquisition started
 > acq status
 Acquisition status:
   State: COMPLETE
-  Samples: 100
+  Valid samples: 10
+  Configured samples: 10
+  Buffer capacity: 1024
   Error: NONE
   Transfer mode: DMA
   Sampling rate: 1000 Hz
 
 > acq result
 Acquisition result:
-  Samples: 100
+  Samples: 10
   Minimum: 2044 (1.647 V)
   Maximum: 2052 (1.653 V)
   Average: 2048 (1.650 V)
   Peak-to-peak: 8 (0.006 V)
+
+> acq dump
+BEGIN_ACQUISITION
+RATE_HZ,1000
+SAMPLE_COUNT,10
+FORMAT,INDEX_RAW
+DATA
+0,2048
+1,2050
+2,2049
+3,2051
+4,2047
+5,2048
+6,2052
+7,2050
+8,2049
+9,2048
+END_ACQUISITION
 ```
 
 The numerical values shown above are illustrative. Actual results depend on the connected signal and measurement conditions.
 
-## ADC Architecture
+---
+
+# ADC Architecture
 
 ADC1 is configured with two independent conversion groups.
 
-### Injected ADC Group
+## Injected ADC Group
 
 The injected ADC group is used for immediate diagnostic measurements.
 
@@ -323,7 +606,7 @@ adc raw
 adc voltage
 ```
 
-### Regular ADC Group
+## Regular ADC Group
 
 The regular ADC group is used for hardware-timed DMA acquisition.
 
@@ -353,27 +636,34 @@ This group is used by:
 
 ```text
 acq start
-acq status
 acq stop
+acq status
 acq result
+acq dump
 ```
 
 Immediate injected conversions are not allowed while a DMA acquisition is running.
 
-## DMA Acquisition Sequence
+---
+
+# DMA Acquisition Sequence
 
 The acquisition starts in the following order:
 
 ```text
 1. Validate the acquisition state
-2. Clear the previous error
-3. Reset the number of valid samples
-4. Prepare ADC1 and DMA2 Stream 0
-5. Provide the sample buffer address
-6. Provide the requested sample count
-7. Start TIM2
-8. Store the acquisition start time
-9. Change the state to RUNNING
+2. Read the actual sampling frequency
+3. Calculate the expected acquisition duration
+4. Calculate the dynamic timeout
+5. Clear the previous error
+6. Reset the number of valid samples
+7. Prepare ADC1 and DMA2 Stream 0
+8. Provide the acquisition-buffer address
+9. Provide the configured sample count
+10. Start TIM2
+11. Store the captured sampling frequency
+12. Store the acquisition start time
+13. Change the state to RUNNING
 ```
 
 Starting ADC and DMA before TIM2 ensures that the destination buffer is ready before the first ADC trigger occurs.
@@ -396,7 +686,7 @@ Stop TIM2
 Stop ADC and DMA
     |
     v
-Mark samples as valid
+Mark configured samples as valid
     |
     v
 Change state to COMPLETE
@@ -420,13 +710,15 @@ Stop TIM2
 Stop ADC and DMA
     |
     v
-Store the error cause
+Store error cause
     |
     v
 Change state to ERROR
 ```
 
-## Previous Acquisition Architecture
+---
+
+# Previous Acquisition Architecture
 
 The first acquisition implementation used:
 
@@ -465,7 +757,7 @@ DMA
 Sample buffer
 ```
 
-The DMA architecture successfully completes 100-sample acquisitions without requiring the CPU to start, read, and store every individual ADC sample.
+The DMA architecture completes configurable acquisitions without requiring the CPU to start, read, and store every ADC sample.
 
 This progression demonstrates:
 
@@ -476,7 +768,9 @@ This progression demonstrates:
 - Hardware validation
 - Regression testing
 
-## Module Responsibilities
+---
+
+# Module Responsibilities
 
 ```text
 main.c / main.h
@@ -495,8 +789,11 @@ console.c / console.h
 commands.c / commands.h
   Command table
   Command lookup
+  Argument parsing
+  Numeric conversion
   Command dispatch
   User-readable responses
+  Acquisition-buffer export
 
 led.c / led.h
   Encapsulated GPIO control for LD2
@@ -510,14 +807,20 @@ adc_measurement.c / adc_measurement.h
 
 sampling_timer.c / sampling_timer.h
   TIM2 handle management
+  Dynamic sampling-frequency configuration
+  Actual-frequency calculation
+  Timer running-state management
   Start and stop of the hardware sampling time base
 
 acquisition.c / acquisition.h
   DMA acquisition coordination
   Acquisition state machine
+  Configurable sample-count management
   Acquisition error classification
-  Sample buffer management
-  Timeout supervision
+  Private sample-buffer management
+  Safe sample access
+  Capture metadata
+  Dynamic timeout supervision
   Buffer statistics
   Transfer-complete callback
   ADC and DMA error callback
@@ -532,7 +835,9 @@ dma.c / dma.h
   DMA initialization generated by STM32CubeMX
 ```
 
-## Cooperative Superloop
+---
+
+# Cooperative Superloop
 
 The application uses a cooperative superloop for non-interrupt processing:
 
@@ -546,7 +851,7 @@ while (1)
 
 `Acquisition_Process()` does not transfer individual ADC samples.
 
-DMA automatically performs the transfers between ADC1 and the acquisition buffer.
+DMA automatically performs transfers between ADC1 and the acquisition buffer.
 
 The current responsibility of `Acquisition_Process()` is to supervise acquisition timeout behavior without blocking the application.
 
@@ -577,29 +882,31 @@ void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
 }
 ```
 
-The callbacks perform only short state and peripheral management operations.
+Callbacks perform only short state and peripheral-management operations.
 
-Formatting, UART responses, and buffer analysis are performed outside interrupt context.
+Formatting, UART responses, buffer statistics, and data exports are performed outside interrupt context.
 
-## Hardware Validation
+---
+
+# Hardware Validation
 
 The measurement system has been tested at several points across the ADC input range.
 
-### A0 Connected to GND
+## A0 Connected to GND
 
 ```text
 ADC raw: close to 0
 ADC voltage: close to 0.000 V
 ```
 
-### A0 Connected to 3.3 V
+## A0 Connected to 3.3 V
 
 ```text
 ADC raw: close to 4095
 ADC voltage: close to 3.3 V
 ```
 
-### Equal-Resistor Divider
+## Equal-Resistor Divider
 
 ```text
 Expected voltage: approximately half of the supply
@@ -607,30 +914,62 @@ ADC result: approximately mid-scale
 Result verified using a multimeter
 ```
 
-### Potentiometer
+## Potentiometer
 
 The potentiometer was used to generate adjustable DC input voltages across the permitted ADC range.
 
 The measurements were compared with a multimeter.
 
-### DMA Acquisition Results
+## Configurable Acquisition Validation
 
-The DMA acquisition path has been tested successfully with known DC input voltages.
+The following sampling frequencies have been tested:
 
-Verified behavior:
+```text
+10 Hz
+100 Hz
+500 Hz
+1000 Hz
+3000 Hz requested, 3003 Hz actual
+10000 Hz
+```
+
+The following acquisition sizes have been tested:
+
+```text
+10 samples
+100 samples
+256 samples
+512 samples
+1024 samples
+```
+
+Validated behavior:
 
 ```text
 Initial state: IDLE
-Acquisition state: RUNNING
-Final state: COMPLETE
-Valid samples: 100
-Acquisition error: NONE
-Measured voltage: consistent with the applied input
+Active state: RUNNING
+Successful final state: COMPLETE
+Manual-stop final state: IDLE
+Valid sample count: equal to requested count after completion
+Partial-acquisition valid count: 0 after manual stop
+Acquisition error: NONE during successful tests
 ```
 
-Multiple consecutive acquisitions have also been completed successfully.
+The tests also confirmed:
 
-## Hardware
+- Frequency changes are rejected during `RUNNING`.
+- Sample-count changes are rejected during `RUNNING`.
+- Manual stop works during `RUNNING`.
+- Configurations outside the valid ranges are rejected.
+- Invalid command arguments are rejected.
+- Consecutive acquisitions work without reset.
+- The previous complete capture remains available until a new acquisition starts.
+- Changing future acquisition settings does not alter previous valid results.
+- The full 1024-sample buffer can be acquired and exported.
+
+---
+
+# Hardware
 
 - NUCLEO-F446RE
 - STM32F446RE microcontroller
@@ -647,7 +986,9 @@ Multiple consecutive acquisitions have also been completed successfully.
 - FNIRSI oscilloscope and signal generator
 - Operational amplifiers and analog components for future front-end experiments
 
-## Software and Tools
+---
+
+# Software and Tools
 
 - STM32CubeIDE
 - STM32CubeMX
@@ -661,9 +1002,20 @@ Multiple consecutive acquisitions have also been completed successfully.
 
 Python is not part of the real-time acquisition path.
 
-Python is planned as a final tool for repeatable testing, data collection, calibration experiments, and report generation after the embedded platform is stable.
+Python will be used for:
 
-## Serial Configuration
+- Serial communication
+- Automated acquisition configuration
+- Sample download
+- CSV storage
+- Repeated tests
+- Plot generation
+- PASS/FAIL evaluation
+- Calibration-report generation
+
+---
+
+# Serial Configuration
 
 Use the ST-LINK Virtual COM Port with:
 
@@ -684,7 +1036,9 @@ Local line editing: Force off
 
 The STM32 performs character echo and line editing.
 
-## Build and Run
+---
+
+# Build and Run
 
 1. Clone or download the repository.
 2. Import the project into STM32CubeIDE as an existing project.
@@ -695,14 +1049,18 @@ The STM32 performs character echo and line editing.
 7. Connect only signals that remain inside the permitted ADC voltage range.
 8. Use `help` to display the available commands.
 
-## Development Roadmap
+---
 
-### Completed
+# Development Roadmap
+
+## Completed
 
 - [x] Modular UART console
 - [x] UART reception using interrupts
 - [x] Protected line buffer and input editing
 - [x] Command table using function pointers
+- [x] Commands with arguments
+- [x] Numeric argument validation
 - [x] System status and firmware version commands
 - [x] Modular LED driver
 - [x] ADC1 configuration on PA0
@@ -716,7 +1074,6 @@ The STM32 performs character echo and line editing.
 - [x] TIM2 TRGO generation
 - [x] ADC regular conversion triggered by TIM2
 - [x] DMA2 Stream 0 peripheral-to-memory transfer
-- [x] Fixed 100-sample acquisition buffer
 - [x] Acquisition state machine
 - [x] DMA transfer-complete callback
 - [x] ADC and DMA error callback
@@ -725,34 +1082,34 @@ The STM32 performs character echo and line editing.
 - [x] Acquisition stop command
 - [x] Acquisition status command
 - [x] Acquisition result command
-- [x] Non-blocking acquisition timeout supervision
-- [x] Statistics calculated from the completed DMA buffer
+- [x] Configurable sampling frequency
+- [x] Actual sampling-frequency reporting
+- [x] Configurable acquisition sample count
+- [x] Acquisition buffer with 1024-sample capacity
+- [x] Dynamic acquisition-duration calculation
+- [x] Dynamic timeout calculation
+- [x] Safe reconfiguration only while inactive
+- [x] Safe access to individual acquisition samples
+- [x] Complete acquisition-buffer export
+- [x] Capture metadata preserved after reconfiguration
+- [x] Statistics calculated from valid DMA samples
 - [x] Hardware validation using known DC inputs
 - [x] Multimeter comparison
 - [x] Multiple consecutive DMA acquisitions
+- [x] Manual stop validated during `RUNNING`
+- [x] Full 1024-sample acquisition and export
 - [x] Git and GitHub workflow
+- [x] Version 1.0 project-scope document
 
-### Current Phase
+## Current Phase
 
-- [ ] Validate all acquisition fault paths
-- [ ] Test timeout using controlled fault injection
-- [ ] Validate manual stop during the `RUNNING` state
-- [ ] Improve recovery after ADC, DMA, or timer errors
-- [ ] Document repeated acquisition tests
-- [ ] Finalize robust DMA acquisition behavior
+- [ ] Update acquisition documentation
+- [ ] Commit configurable sample count and buffer export
+- [ ] Prepare safe FNIRSI connection
+- [ ] Define controlled waveform test cases
+- [ ] Validate structured acquisition export with real waveforms
 
-### Configurable Acquisition
-
-- [ ] Configurable sampling frequency
-- [ ] Configurable sample count
-- [ ] Dynamic acquisition duration calculation
-- [ ] Dynamic timeout calculation
-- [ ] Validation of requested and achieved timer frequency
-- [ ] Larger acquisition buffers
-- [ ] Safe timer reconfiguration
-- [ ] Safe reconfiguration only while acquisition is inactive
-
-### Controlled Waveform Acquisition
+## Controlled Waveform Acquisition
 
 - [ ] Validate sine-wave acquisition
 - [ ] Validate square-wave acquisition
@@ -764,7 +1121,7 @@ The STM32 performs character echo and line editing.
 - [ ] Demonstrate aliasing and sampling limitations
 - [ ] Compare STM32 measurements with the FNIRSI oscilloscope
 
-### Signal Characterization
+## Signal Characterization
 
 - [ ] Baseline or pedestal estimation
 - [ ] RMS noise calculation
@@ -773,25 +1130,26 @@ The STM32 performs character echo and line editing.
 - [ ] Peak index calculation
 - [ ] Time-to-peak calculation
 - [ ] Pulse duration estimation
-- [ ] Approximate digital pulse area
 - [ ] Saturation detection
 - [ ] Repetition stability analysis
 
-### Educational Analog Front-End
+Digital pulse area is optional for version 1.0.
+
+## Educational Analog Front-End
 
 - [ ] Input protection
 - [ ] Operational-amplifier stage
-- [ ] Configurable gain
+- [ ] Defined gain or attenuation
 - [ ] Signal offset
 - [ ] Low-pass filtering
-- [ ] Pulse shaping experiments
+- [ ] Pulse-shaping experiments
 - [ ] Power-supply decoupling
 - [ ] Analog monitoring points
 - [ ] LTspice simulation
 - [ ] Breadboard implementation
 - [ ] Oscilloscope validation
 
-### Calibration and Monitoring
+## Calibration and Monitoring
 
 - [ ] Apply known calibration signals
 - [ ] Measure gain
@@ -805,36 +1163,49 @@ The STM32 performs character echo and line editing.
 - [ ] Monitor reference and offset voltages
 - [ ] Define reproducible laboratory procedures
 
-### Robustness and Data Integrity
+## Robustness and Data Integrity
 
 - [ ] Controlled timeout fault injection
-- [ ] ADC error counters
-- [ ] DMA error counters
-- [ ] Timer error counters
-- [ ] Acquisition recovery command
-- [ ] Independent watchdog integration
-- [ ] Last reset reason
-- [ ] Structured acquisition records
-- [ ] Capture identifiers
+- [ ] Invalid-configuration error classification
+- [ ] Structured capture identifier
 - [ ] Timestamps
-- [ ] Checksums or CRC
-- [ ] Invalid-configuration tests
+- [ ] Checksum or CRC evaluation
 - [ ] Repeated acquisition stress tests
+- [ ] Document current blocking UART-export limitation
 
-### Final Test Automation
+The following features are outside version 1.0 and remain Future Work:
 
-- [ ] UART data extraction
-- [ ] Automated acquisition configuration
+```text
+DMA circular mode
+UART DMA
+FreeRTOS
+Multiple simultaneous ADC channels
+Custom PCB
+Wireless communication
+```
+
+## Final Test Automation
+
+- [ ] Python serial connection
+- [ ] Automated firmware communication check
+- [ ] Automated sampling-rate configuration
+- [ ] Automated sample-count configuration
 - [ ] Automated acquisition execution
+- [ ] Acquisition-status polling
+- [ ] Structured data extraction
 - [ ] CSV result storage
 - [ ] Repeated amplitude tests
 - [ ] Repeated frequency tests
 - [ ] Automated calibration measurements
 - [ ] Automated result comparison
-- [ ] Test summary generation
+- [ ] PASS/FAIL evaluation
+- [ ] Plot generation
+- [ ] Test-summary generation
 - [ ] Final validation report
 
-## Final Target Architecture
+---
+
+# Final Target Architecture
 
 ```text
 Controlled test signal
@@ -845,7 +1216,7 @@ Input protection
         v
 Educational analog front-end
         |
-        +---- Configurable gain
+        +---- Defined gain or attenuation
         |
         +---- Signal offset
         |
@@ -861,7 +1232,7 @@ Hardware timer trigger
 DMA transfer
         |
         v
-Acquisition buffer
+Configurable acquisition buffer
         |
         v
 Signal characterization
@@ -876,8 +1247,6 @@ Signal characterization
         |
         +---- Peak time
         |
-        +---- Digital area
-        |
         +---- Linearity
         |
         +---- Saturation
@@ -886,50 +1255,64 @@ Signal characterization
 Monitoring and acquisition record
         |
         v
-UART interface
+UART data export
         |
         v
-Reproducible validation workflow
+*ython test automation
+        |
+*       v
+Re*roducible validation report
 ```
 
-## Long-Term Goal
+-*-
 
-The long-term goal is to produce a tested and documented embedded instrumentation demonstrator that connects:
+# Long-Term Goal
+
+The long-term*goal is to produce a tested and do*umented embedded instrumentation d*monstrator that connects:
+
+```text*Embedded firmware
++ analog electro*ics
++ data*acquisition
+* signal characterization
++ calibra*ion
++ electronic monitoring
++*Python test automation
++ laborator* validation
+```
+
+The final platfor* will be used to study how an anal*g signal passes through a simplifi*d electronic readout chain, how th* signal is sampled and stored, and*how the performance of the complet* chain can be measured using contr*lled and reproducible experiments.*
+The project is educational and in*pired by general scientific instru*entation and detector-readout chal*enges.
+
+The project does not claim*equivalence with specialized detec*or electronics.
+
+The version 1.0 d*finition and completion criteria a*e maintained in:
 
 ```text
-Embedded firmware
-+ analog electronics
-+ data acquisition
-+ signal characterization
-+ calibration
-+ electronic monitoring
-+ laboratory validation
-```
+docs/PRO*ECT_SCOPE.md
+*`*
 
-The final platform will be used to study how an analog signal passes through a simplified electronic readout chain, how the signal is sampled and stored, and how the performance of the complete chain can be measured using controlled experiments.
+---
 
-The project is educational and inspired by general scientific instrumentation and detector-readout challenges.
+# Safety
 
-The project does not claim equivalence with specialized detector electronics.
+The STM32 ADC inp*t is not an oscilloscope input and*does not provide the same input pr*tection.
 
-## Safety
+Before connecting an ext*rnal signal generator:
 
-The STM32 ADC input is not an oscilloscope input and does not provide the same input protection.
-
-Before connecting an external signal generator:
-
-- Keep the input inside the permitted microcontroller voltage range.
-- Do not apply negative voltage directly to PA0.
-- Connect the instrument ground to the Nucleo ground.
-- Verify signal amplitude and offset with the oscilloscope first.
-- Use suitable current limiting and voltage division.
-- Add input protection when required.
-- Disconnect power while modifying breadboard wiring.
-- Verify the official board pinout.
-- Avoid applying a signal while the expected voltage range is unknown.
+- Keep the*input inside the permitted microco*troller voltage range.
+- Do not ap*ly negative voltage directly to PA*.
+- Connect the instrument ground *o the Nucleo ground.
+- Verify sign*l amplitude and offset with the os*illoscope first.
+- Use suitable cu*rent limiting and voltage division*
+- Add input protection when requi*ed.
+- Disconnect power while modif*ing breadboard wiring.
+- Verify th* official board pinout.
+- Avoid ap*lying a signal while the expected *oltage range is unknown.
 - Confirm front-end output limits before connecting the output to the ADC.
 
-## Author
+---
+
+# Author
 
 **Samuel David Medina Contreras**
 
@@ -940,4 +1323,6 @@ Electronic Engineering student focused on:
 - Data acquisition
 - Scientific instrumentation
 - Analog electronics
-- Hardware and firmware validation
+- Firmware validation
+- Hardware validation
+- Test automation
