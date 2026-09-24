@@ -1258,56 +1258,56 @@ Monitoring and acquisition record
 UART data export
         |
         v
-*ython test automation
+python test automation
         |
-*       v
-Re*roducible validation report
+        v
+Reproducible validation report
 ```
 
 -*-
 
 # Long-Term Goal
 
-The long-term*goal is to produce a tested and do*umented embedded instrumentation d*monstrator that connects:
+The long-term goal is to produce a tested and documented embedded instrumentation demonstrator that connects:
 
-```text*Embedded firmware
-+ analog electro*ics
+```text Embedded firmware
++ analog electronics
 + data*acquisition
-* signal characterization
++ signal characterization
 + calibra*ion
 + electronic monitoring
-+*Python test automation
-+ laborator* validation
++ Python test automation
++ laboratory validation
 ```
 
-The final platfor* will be used to study how an anal*g signal passes through a simplifi*d electronic readout chain, how th* signal is sampled and stored, and*how the performance of the complet* chain can be measured using contr*lled and reproducible experiments.*
-The project is educational and in*pired by general scientific instru*entation and detector-readout chal*enges.
+The final platform will be used to study how an anal*g signal passes through a simplified electronic readout chain, how the signal is sampled and stored, and*how the performance of the complete chain can be measured using controlled and reproducible experiments.
+The project is educational and inspired by general scientific instrumentation and detector-readout challenges.
 
-The project does not claim*equivalence with specialized detec*or electronics.
+The project does not claim*equivalence with specialized detector electronics.
 
-The version 1.0 d*finition and completion criteria a*e maintained in:
+The version 1.0 definition and completion criteria are maintained in:
 
 ```text
-docs/PRO*ECT_SCOPE.md
-*`*
+docs/PROJECT_SCOPE.md
+```
 
 ---
 
 # Safety
 
-The STM32 ADC inp*t is not an oscilloscope input and*does not provide the same input pr*tection.
+The STM32 ADC input is not an oscilloscope input and*does not provide the same input protection.
 
-Before connecting an ext*rnal signal generator:
+Before connecting an external signal generator:
 
-- Keep the*input inside the permitted microco*troller voltage range.
-- Do not ap*ly negative voltage directly to PA*.
-- Connect the instrument ground *o the Nucleo ground.
-- Verify sign*l amplitude and offset with the os*illoscope first.
+- Keep the input inside the permitted microcontroller voltage range.
+- Do not apply negative voltage directly to PA.
+- Connect the instrument ground to the Nucleo ground.
+- Verify sign*l amplitude and offset with the oscilloscope first.
 - Use suitable cu*rent limiting and voltage division*
-- Add input protection when requi*ed.
-- Disconnect power while modif*ing breadboard wiring.
-- Verify th* official board pinout.
-- Avoid ap*lying a signal while the expected *oltage range is unknown.
+- Add input protection when required.
+- Disconnect power while modifying breadboard wiring.
+- Verify the official board pinout.
+- Avoid ap*lying a signal while the expected voltage range is unknown.
 - Confirm front-end output limits before connecting the output to the ADC.
 
 ---
