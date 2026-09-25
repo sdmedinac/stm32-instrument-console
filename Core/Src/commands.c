@@ -577,13 +577,13 @@ static void Command_Acquisition_Dump(const char *args)
 	valid_samples = Acquisition_GetSampleCount();
 	captured_sampling_frequency = Acquisition_GetCapturedSamplingFrequency();
 
-	Console_Write("\r\nBEGUIN_ACQUISITION");
+	Console_Write("\r\nBEGIN_ACQUISITION");
 	snprintf(
 			line,
 			sizeof(line),
-			"\r\nRATE_HZ, %lu"
-			"\r\nSAMPLE_COUNT, %u"
-			"\r\nFORMAT, INDEX_RAW"
+			"\r\nRATE_HZ,%lu"
+			"\r\nSAMPLE_COUNT,%u"
+			"\r\nFORMAT,INDEX_RAW"
 			"\r\nDATA",
 			(unsigned long)captured_sampling_frequency,
 			(unsigned int)valid_samples
@@ -604,7 +604,7 @@ static void Command_Acquisition_Dump(const char *args)
 		snprintf(
 				line,
 				sizeof(line),
-				"\r\n%u, %u",
+				"\r\n%u,%u",
 				(unsigned int)index,
 				(unsigned int)sample
 		);

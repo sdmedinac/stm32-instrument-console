@@ -272,18 +272,22 @@ The STM32 must acquire controlled signals generated using the FNIRSI signal gene
 
 The minimum required signal types are:
 
-- Sine wave
-- Square wave
-- Unipolar pulse
+- [x] Sine-wave acquisition
+- [x] Square-wave acquisition
+- [x] Unipolar-pulse acquisition
+
+Additional waveform validation:
+
+- [x] Triangle-wave acquisition
 
 The experiments must include:
 
-- At least three signal frequencies
-- At least three signal amplitudes
-- At least two safe DC offset conditions
-- Different STM32 sampling frequencies
-- Different acquisition sample counts
-- Different acquisition window durations
+- [ ] At least three signal frequencies
+- [ ] At least three signal amplitudes
+- [ ] At least two safe DC offset conditions
+- [ ] Different STM32 sampling frequencies
+- [ ] Different acquisition sample counts
+- [ ] Different acquisition window durations
 
 ## Acceptance Criteria
 
@@ -326,6 +330,30 @@ Acquisition window duration
 ```
 
 At least one experiment must demonstrate the effect of insufficient sampling frequency or aliasing.
+
+## Current Validation Status
+
+The following controlled waveform acquisitions have been completed using a sampling frequency of 1000 Hz and an acquisition size of 512 samples:
+
+- [x] Square wave at approximately 10 Hz
+- [x] Sine wave at approximately 10 Hz
+- [x] Triangle wave at approximately 10 Hz
+- [x] Unipolar pulse at approximately 10 Hz and 10 percent duty cycle
+- [x] Approximate waveform period verified from the sample indices
+- [x] Approximately 100 samples per period verified
+- [x] Approximately five waveform periods captured in a 512 ms acquisition window
+- [x] STM32 voltage range compared with the FNIRSI oscilloscope
+- [x] Instrument and test-setup limitations documented
+- [x] Detailed experimental procedure and results documented in `docs/experiments/WAVEFORM_VALIDATION.md`
+
+The following controlled-waveform requirements remain pending:
+
+- [ ] Validation at additional signal frequencies
+- [ ] Validation at additional signal amplitudes
+- [ ] Validation using additional safe DC offset conditions
+- [ ] Comparison using different STM32 sampling frequencies
+- [ ] Comparison using different acquisition sizes
+- [ ] Aliasing or insufficient-sampling demonstration
 
 ---
 
@@ -763,6 +791,22 @@ The version 1.0 release must contain:
 - [ ] Peak time calculation
 - [ ] Saturation detection
 
+## Controlled Waveform Validation
+
+- [x] Square-wave acquisition
+- [x] Sine-wave acquisition
+- [x] Triangle-wave acquisition
+- [x] Unipolar-pulse acquisition
+- [x] Waveform timing analyzed using sample indices
+- [x] Oscilloscope and STM32 results compared
+- [x] Test-setup limitations documented
+- [ ] Three signal frequencies tested
+- [ ] Three signal amplitudes tested
+- [ ] Two safe DC offset conditions tested
+- [ ] Different STM32 sampling frequencies compared
+- [ ] Different acquisition-window sizes compared
+- [ ] Aliasing or insufficient-sampling behavior demonstrated
+
 ## Analog Electronics
 
 - [ ] Input protection
@@ -813,7 +857,7 @@ The version 1.0 release must contain:
 - [ ] UART data format documented
 - [ ] Front-end schematic included
 - [ ] LTspice simulation included
-- [ ] Experimental procedure included
+- [x] Experimental procedure included
 - [ ] Calibration results included
 - [ ] Known limitations included
 - [ ] Future work separated from version 1.0

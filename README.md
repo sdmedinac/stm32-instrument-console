@@ -1051,6 +1051,23 @@ The STM32 performs character echo and line editing.
 
 ---
 
+## Controlled Waveform Validation
+
+The hardware-timed acquisition system has been validated using controlled waveforms generated with the FNIRSI signal generator.
+
+Validated waveform types:
+
+- Square wave
+- Sine wave
+- Triangle wave
+- Unipolar pulse
+
+All tests used TIM2-triggered ADC sampling, DMA transfers, configurable acquisition settings, and structured UART data export.
+
+Detailed procedures, measurements, observations, and conclusions are available in:
+
+docs/experiments/WAVEFORM_VALIDATION.md
+
 # Development Roadmap
 
 ## Completed
