@@ -287,3 +287,31 @@ HAL_StatusTypeDef Acquisition_GetSample(uint16_t index, uint16_t *sample)
 
 	return HAL_OK;
 }
+
+HAL_StatusTypeDef Acquisition_GetCharacterization(
+		uint16_t baseline_start,
+		uint16_t baseline_count,
+		SignalCharacterizationResult *result
+)
+{
+	if(result == NULL)
+		return HAL_ERROR;
+
+	if(acquisition_state != ACQUISITION_STATE_COMPLETE)
+		return HAL_BUSY;
+
+	if(sample_index == 0U)
+		return HAL_ERROR;
+
+	if(captured_sampling_frequency_hz == 0U)
+		return HAL_ERROR;
+
+	return SignalCharacterization_Analyze(
+			sample_buffer,
+			sample_index,
+			captured_sampling_frequency_hz,
+			baseline_start,
+			baseline_count,
+			result
+	);
+}

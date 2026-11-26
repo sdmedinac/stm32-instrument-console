@@ -10,6 +10,7 @@
 
 #include "stm32f4xx_hal.h"
 #include "adc_measurement.h"
+#include "signal_characterization.h"
 
 typedef enum
 {
@@ -48,5 +49,10 @@ HAL_StatusTypeDef Acquisition_GetStats(ADC_MeasurementStats *stats);
 HAL_StatusTypeDef Acquisition_Stop(void);
 HAL_StatusTypeDef Acquisition_SetSampleCount(uint16_t sample_count);
 HAL_StatusTypeDef Acquisition_GetSample(uint16_t index, uint16_t *sample);
+HAL_StatusTypeDef Acquisition_GetCharacterization(
+		uint16_t baseline_start,
+		uint16_t baseline_count,
+		SignalCharacterizationResult *result
+);
 
 #endif /* INC_ACQUISITION_H_ */

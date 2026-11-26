@@ -41,6 +41,7 @@ static void Command_Acquisition_Stop(const char *args);
 static void Command_Acquisition_Rate(const char *args);
 static void Command_Acquisition_Size(const char *args);
 static void Command_Acquisition_Dump(const char *args);
+static void Command_Signal_Result(const char *args);
 
 static const CommandEntry
 command_table[] = {
@@ -59,7 +60,8 @@ command_table[] = {
 		{"acq stop", "Stop the active acquisition", Command_Acquisition_Stop},
 		{"acq rate", "Set sampling rate in hz", Command_Acquisition_Rate},
 		{"acq size", "Set the acquisition sample count", Command_Acquisition_Size},
-		{"acq dump", "Export the completed acq buffer", Command_Acquisition_Dump}
+		{"acq dump", "Export the completed acq buffer", Command_Acquisition_Dump},
+		{"signal result", "Characterize a complete acquisition", Command_Signal_Result}
 
 };
 
@@ -613,4 +615,125 @@ static void Command_Acquisition_Dump(const char *args)
 	}
 
 	Console_Write("\r\nEND_ACQUISITION");
+}
+
+static void Command_Signal_Result(const char *args)
+{
+	unsigned long parsed_start;
+	unsigned long parsed_count;
+
+	char *end_pointer;
+	const char *second_argument;
+
+	uint16_t baseline_start;
+	uint16_t baseline_count;
+	uint16_t baseline_last;
+
+	HAL_StatusTypeDef status;
+	SignalCharacterizationResult result;
+
+	char response[384];
+
+	if(*args == '\0')
+	{
+		Console_Write("\r\n Usage: signal result <baseline start> <baseline count>");
+		return;
+	}
+
+	parsed_start = strtoul(args, &end_pointer, 10);
+
+	if(end_pointer == args)
+	{
+		Console_Write("\r\nInvalid signal characterization arguments");
+		return;
+	}
+
+	while(*end_pointer == ' ')
+	{
+		end_pointer++;
+	}
+
+	if(*end_pointer == '\0')
+	{
+		Console_Write("\r\n Usage: signal result <baseline start> <baseline count>");
+		return;
+	}
+
+	second_argument = end_pointer;
+
+	parsed_count = strtoul(second_argument, &end_pointer, 10);
+
+	if(end_pointer == second_argument)
+	{
+		Console_Write("\r\nInvalid signal characterization arguments");
+		return;
+	}
+
+	while(*end_pointer == ' ')
+	{
+		end_pointer++;
+	}
+
+	if(*end_pointer != '\0')
+	{
+		Console_Write("\r\nInvalid signal characterization arguments");
+		return;
+	}
+
+	if((parsed_start > UINT16_MAX) || (parsed_count > UINT16_MAX))
+	{
+		Console_Write("\r\n Characterization argument is too large");
+		return;
+	}
+
+	baseline_start = (uint16_t)parsed_start;
+	baseline_count = (uint16_t)parsed_count;
+
+	status = Acquisition_GetCharacterization(baseline_start, baseline_count, &result);
+
+	if(status == HAL_BUSY)
+	{
+		Console_Write("\r\nNo completed acquisition is available");
+		return;
+	}
+
+	if(status == HAL_ERROR)
+	{
+		Console_Write("\r\nInvalid baseline region");
+		return;
+	}
+
+	if(status != HAL_OK)
+	{
+		Console_Write("\r\nCharacterization failed");
+		return;
+	}
+
+	baseline_last = baseline_start + baseline_count - 1U;
+
+	snprintf(
+			response,
+			sizeof(response),
+			"\r\nSignal characterization:"
+			"\r\n Baseline region: %u-%u"
+			"\r\n Baseline: %lu counts"
+			"\r\n RMS noise: %.2f counts"
+			"\r\n Peak value: %u counts"
+			"\r\n Peak index: %u"
+			"\r\n Peak time: %lu us"
+			"\r\n Amplitude: %lu counts"
+			"\r\n Lower saturation: %s"
+			"\r\n Upper saturation: %s",
+			(unsigned int)baseline_start, (unsigned int)baseline_last,
+			(unsigned long)result.baseline,
+			(double)result.rms_noise,
+			(unsigned int)result.peak_value,
+			(unsigned int)result.peak_index,
+			(unsigned long)result.peak_time_us,
+			(unsigned long)result.amplitude,
+			result.lower_saturation ? "YES" : "NO",
+			result.upper_saturation ? "YES" : "NO"
+	);
+
+	Console_Write(response);
 }
